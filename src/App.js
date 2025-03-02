@@ -4,6 +4,8 @@ import QuizList from "./components/QuizList";
 import QuizDetail from "./components/QuizDetail";
 import UserManagement from "./components/UserManagement";
 import Login from "./components/Login";
+import PlantManagement from "./components/PlantManagement";
+import AvatarManagement from "./components/AvatarManagement";
 
 const App = () => {
   return (
@@ -13,6 +15,8 @@ const App = () => {
         <Route path="/quizzes" element={<QuizList />} />
         <Route path="/quizzes/:id" element={<QuizDetail />} />
         <Route path="/user-management" element={<UserManagement />} />
+        <Route path="/plant" element={<PlantManagement />} />
+        <Route path="/avatar" element={<AvatarManagement />} />
       </Routes>
     </Router>
   );
