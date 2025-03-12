@@ -5,11 +5,13 @@ import {
   TableHead, TableRow, Paper, Button, TextField,
   Dialog, DialogActions, DialogContent, DialogTitle
 } from "@mui/material";
+import { BASE_API } from "../constant";
 
-const API_URL = "https://67c8a8f60acf98d070875a36.mockapi.io/PlantApplications";
+const API_URL = BASE_API + "/plantapplication";
 
 const PlantApplicationManagement = () => {
   const [applications, setApplications] = useState([]);
+  console.log("🚀 ~ PlantApplicationManagement ~ applications:", applications)
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingApplication, setEditingApplication] = useState({ name: "", description: "" });
@@ -17,7 +19,11 @@ const PlantApplicationManagement = () => {
   useEffect(() => { fetchApplications(); }, []);
 
   const fetchApplications = async () => {
-    const { data } = await axios.get(API_URL);
+    const { data } = await axios.get(API_URL,{
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
     setApplications(data);
   };
 
@@ -55,9 +61,9 @@ const PlantApplicationManagement = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {applications.filter(a => a.name.toLowerCase().includes(search.toLowerCase())).map(app => (
+            {applications.filter(a => a.plantName?.toLowerCase().includes(search?.toLowerCase())).map(app => (
               <TableRow key={app.id}>
-                <TableCell>{app.name}</TableCell>
+                <TableCell>{app.plantName}</TableCell>
                 <TableCell>{app.description}</TableCell>
                 <TableCell>
                   <Button onClick={() => { setEditingApplication(app); setOpen(true); }}>Edit</Button>
@@ -73,7 +79,7 @@ const PlantApplicationManagement = () => {
         <DialogTitle>{editingApplication.id ? "Edit Application" : "Add Application"}</DialogTitle>
         <DialogContent>
           <TextField label="Name" fullWidth margin="dense"
-            value={editingApplication.name}
+            value={editingApplication.plantName}
             onChange={(e) => setEditingApplication({ ...editingApplication, name: e.target.value })} />
           <TextField label="Description" fullWidth margin="dense"
             value={editingApplication.description}

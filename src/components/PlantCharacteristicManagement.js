@@ -5,8 +5,9 @@ import {
   TableHead, TableRow, Paper, Button, TextField,
   Dialog, DialogActions, DialogContent, DialogTitle
 } from "@mui/material";
+import { BASE_API } from "../constant";
 
-const API_URL = "https://668012da56c2c76b495b1504.mockapi.io/plantCharacteristics";
+const API_URL = BASE_API + "/plantcharacteristic";
 
 const PlantCharacteristicManagement = () => {
   const [characteristics, setCharacteristics] = useState([]);
@@ -18,7 +19,11 @@ const PlantCharacteristicManagement = () => {
 
   const fetchCharacteristics = async () => {
     try {
-      const { data } = await axios.get(API_URL);
+      const { data } = await axios.get(API_URL,{
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
       setCharacteristics(data);
     } catch (error) {
       console.error("Error fetching characteristics:", error);
@@ -79,10 +84,10 @@ const PlantCharacteristicManagement = () => {
           </TableHead>
           <TableBody>
             {characteristics
-              .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
+              .filter((c) => c.plantName.toLowerCase().includes(search.toLowerCase()))
               .map((char) => (
                 <TableRow key={char.id}>
-                  <TableCell>{char.name}</TableCell>
+                  <TableCell>{char.plantName}</TableCell>
                   <TableCell>{char.description}</TableCell>
                   <TableCell>
                     <Button onClick={() => handleOpenDialog(char)}>Edit</Button>
@@ -103,7 +108,7 @@ const PlantCharacteristicManagement = () => {
             label="Name"
             fullWidth
             margin="dense"
-            value={editingCharacteristic.name}
+            value={editingCharacteristic.plantName}
             onChange={(e) => setEditingCharacteristic({ ...editingCharacteristic, name: e.target.value })}
           />
           <TextField

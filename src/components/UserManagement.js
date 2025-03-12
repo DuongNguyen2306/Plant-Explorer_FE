@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TextField, Button, IconButton, Avatar, Box, Typography, AppBar, Toolbar, TablePagination } from '@mui/material';
 import { Edit, Delete } from '@mui/icons-material';
+import { BASE_API } from '../constant';
 
-const API_URL = 'https://plant-explorer-backend-0-0-1.onrender.com/api/users';
+const API_URL = BASE_API + '/users';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -17,7 +18,10 @@ const UserManagement = () => {
 
   const fetchUsers = (query = '') => {
     axios.get(API_URL, {
-      params: { index: page + 1, pageSize: rowsPerPage, nameSearch: query }
+      params: { index: page + 1, pageSize: rowsPerPage, nameSearch: query },
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
     })
     .then(response => {
       setUsers(Array.isArray(response.data?.data?.items) ? response.data.data.items : []);

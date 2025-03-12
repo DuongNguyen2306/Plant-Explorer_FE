@@ -17,8 +17,9 @@ import {
   Box,
   Typography,
 } from "@mui/material";
+import { BASE_API } from "../constant";
 
-const API_URL = "https://66937520c6be000fa07b9d27.mockapi.io/plants";
+const API_URL = BASE_API + "/plant";
 
 const PlantManagement = () => {
   const [plants, setPlants] = useState([]);
@@ -32,7 +33,11 @@ const PlantManagement = () => {
 
   const fetchPlants = async () => {
     try {
-      const response = await axios.get(API_URL);
+      const response = await axios.get(API_URL, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
       setPlants(response.data);
     } catch (error) {
       console.error("Error fetching plants:", error);

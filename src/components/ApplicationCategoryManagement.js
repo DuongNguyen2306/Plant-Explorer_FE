@@ -5,8 +5,9 @@ import {
   TableHead, TableRow, Paper, Button, TextField,
   Dialog, DialogActions, DialogContent, DialogTitle
 } from "@mui/material";
+import { BASE_API } from "../constant";
 
-const API_URL = "https://67c8a8f60acf98d070875a36.mockapi.io/applicationCategories";
+const API_URL = BASE_API + "/applicationcategory";
 
 const ApplicationCategoryManagement = () => {
   const [categories, setCategories] = useState([]);
@@ -17,7 +18,11 @@ const ApplicationCategoryManagement = () => {
   useEffect(() => { fetchCategories(); }, []);
 
   const fetchCategories = async () => {
-    const { data } = await axios.get(API_URL);
+    const { data } = await axios.get(API_URL,{
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
     setCategories(data);
   };
 

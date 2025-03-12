@@ -17,8 +17,9 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
+import { BASE_API } from "../constant";
 
-const API_URL = "https://66937520c6be000fa07b9d27.mockapi.io/avatars";
+const API_URL = BASE_API + "/avatar";
 const AVATAR_OPTIONS = [
   "https://cdn-icons-png.flaticon.com/512/147/147142.png",
   "https://cdn-icons-png.flaticon.com/512/6858/6858485.png",

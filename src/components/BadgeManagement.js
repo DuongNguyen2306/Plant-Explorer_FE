@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle, Select, MenuItem, InputLabel, FormControl } from '@mui/material';
+import { BASE_API } from '../constant';
+import ImagePlaceholder from "../assets/placeholder.png";
 
-const API_URL = 'https://6721469298bbb4d93ca804a9.mockapi.io/badges';
+const API_URL = BASE_API + "/badges";
 
 const BadgeManagement = () => {
   const [badges, setBadges] = useState([]);
@@ -17,7 +19,7 @@ const BadgeManagement = () => {
 
   const fetchBadges = async () => {
     const res = await axios.get(API_URL);
-    setBadges(res.data);
+    setBadges(res.data.data.items);
   };
 
   const handleOpenDialog = (badge = null) => {
@@ -32,16 +34,16 @@ const BadgeManagement = () => {
 
   const handleSaveBadge = async () => {
     if (editingBadge.id) {
-      await axios.put(`${API_URL}/${editingBadge.id}`, editingBadge);
+      await axios.put(`${API_URL}/badge?id=${editingBadge.id}`, editingBadge);
     } else {
-      await axios.post(API_URL, editingBadge);
+      await axios.post(`${API_URL}/badge`, editingBadge);
     }
     fetchBadges();
     handleCloseDialog();
   };
 
   const handleDelete = async (id) => {
-    await axios.delete(`${API_URL}/${id}`);
+    await axios.delete(`${API_URL}/badge?id=${id}`);
     fetchBadges();
   };
 
@@ -68,8 +70,8 @@ const BadgeManagement = () => {
           label="Filter by Type"
         >
           <MenuItem value="">All</MenuItem>
-          <MenuItem value="Flower">Flower</MenuItem>
-          <MenuItem value="Bonsai">Bonsai</MenuItem>
+          <MenuItem value="Flower">Gold</MenuItem>
+          <MenuItem value="Bonsai">Silver</MenuItem>
           <MenuItem value="Garden">Garden</MenuItem>
         </Select>
       </FormControl>
@@ -89,7 +91,7 @@ const BadgeManagement = () => {
           <TableBody>
             {filteredBadges.map(badge => (
               <TableRow key={badge.id}>
-                <TableCell><img src={badge.image} width={50} height={50} alt="badge" /></TableCell>
+                <TableCell><img src={badge.image ?? ImagePlaceholder} width={50} height={50} alt="badge" /></TableCell>
                 <TableCell>{badge.name}</TableCell>
                 <TableCell>{badge.type}</TableCell>
                 <TableCell>

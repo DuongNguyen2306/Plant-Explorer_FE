@@ -5,8 +5,9 @@ import {
   TableHead, TableRow, Paper, Button, TextField,
   Dialog, DialogActions, DialogContent, DialogTitle
 } from "@mui/material";
+import { BASE_API } from "../constant";
 
-const API_URL = "https://668012da56c2c76b495b1504.mockapi.io/CharacteristicCategories";
+const API_URL = BASE_API + "/characteristiccategory";
 
 const CharacteristicCategoryManagement = () => {
   const [categories, setCategories] = useState([]);
