@@ -34,18 +34,27 @@ const PlantManagement = () => {
   const fetchPlants = async () => {
     try {
       const response = await axios.get(API_URL, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
+      console.log("📢 API Response:", response.data); // Debug API response
       setPlants(response.data);
     } catch (error) {
-      console.error("Error fetching plants:", error);
+      console.error("🚨 Error fetching plants:", error.response?.data || error);
     }
   };
 
   const handleOpenDialog = (plant = null) => {
-    setEditingPlant(plant);
+    if (plant) {
+      setEditingPlant({ ...plant });
+    } else {
+      setEditingPlant({
+        id: null,
+        name: "",
+        scientificName: "",
+        category: "",
+        family: "", // ⚠ Thêm giá trị mặc định cho `family`
+      });
+    }
     setOpen(true);
   };
 
@@ -54,19 +63,56 @@ const PlantManagement = () => {
     setEditingPlant(null);
   };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditingPlant((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    console.log(`📝 Updating ${name}:`, value);
+  };
+
   const handleSavePlant = async () => {
-    if (editingPlant.id) {
-      await axios.put(`${API_URL}/${editingPlant.id}`, editingPlant);
-    } else {
-      await axios.post(API_URL, editingPlant);
+    console.log("📢 Trước khi gửi API:", editingPlant);
+
+    if (!editingPlant?.name.trim() || !editingPlant?.scientificName.trim()) {
+      console.error("🚨 Error: Name and Scientific Name cannot be empty!");
+      return;
     }
-    fetchPlants();
-    handleCloseDialog();
+
+    const payload = {
+      name: editingPlant.name,
+      scientificName: editingPlant.scientificName,
+      category: editingPlant.category || "Unknown",
+      family: editingPlant.family || "Unknown",
+    };
+
+    console.log("📢 Dữ liệu gửi lên API:", payload);
+
+    try {
+      let response;
+      if (editingPlant.id) {
+        response = await axios.put(`${API_URL}/${editingPlant.id}`, payload);
+        console.log("✅ Update response:", response.data);
+      } else {
+        response = await axios.post(API_URL, payload);
+        console.log("✅ Add response:", response.data);
+      }
+
+      await fetchPlants();
+      handleCloseDialog();
+    } catch (error) {
+      console.error("🚨 Error saving plant:", error.response?.data || error);
+    }
   };
 
   const handleDelete = async (id) => {
-    await axios.delete(`${API_URL}/${id}`);
-    fetchPlants();
+    try {
+      await axios.delete(`${API_URL}/${id}`);
+      fetchPlants();
+    } catch (error) {
+      console.error("🚨 Error deleting plant:", error);
+    }
   };
 
   return (
@@ -121,22 +167,33 @@ const PlantManagement = () => {
             label="Name"
             fullWidth
             margin="dense"
+            name="name"
             value={editingPlant?.name || ""}
-            onChange={(e) => setEditingPlant({ ...editingPlant, name: e.target.value })}
+            onChange={handleInputChange}
           />
           <TextField
             label="Scientific Name"
             fullWidth
             margin="dense"
+            name="scientificName"
             value={editingPlant?.scientificName || ""}
-            onChange={(e) => setEditingPlant({ ...editingPlant, scientificName: e.target.value })}
+            onChange={handleInputChange}
           />
           <TextField
             label="Category"
             fullWidth
             margin="dense"
+            name="category"
             value={editingPlant?.category || ""}
-            onChange={(e) => setEditingPlant({ ...editingPlant, category: e.target.value })}
+            onChange={handleInputChange}
+          />
+          <TextField
+            label="Family"
+            fullWidth
+            margin="dense"
+            name="family"
+            value={editingPlant?.family || ""}
+            onChange={handleInputChange}
           />
         </DialogContent>
         <DialogActions>

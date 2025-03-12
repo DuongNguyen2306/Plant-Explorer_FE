@@ -7,41 +7,68 @@ import {
 } from "@mui/material";
 import { BASE_API } from "../constant";
 
-const API_URL = BASE_API + "/plantcharacteristic";
+const API_URL = BASE_API + "/plantcharacteristic"; // ⚠ Kiểm tra đường dẫn API chính xác
 
 const PlantCharacteristicManagement = () => {
   const [characteristics, setCharacteristics] = useState([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [editingCharacteristic, setEditingCharacteristic] = useState({ name: "", description: "" });
+  const [editingCharacteristic, setEditingCharacteristic] = useState({
+    id: null,
+    plantId: "",
+    characteristicCategoryId: "",
+    description: "",
+  });
 
-  useEffect(() => { fetchCharacteristics(); }, []);
+  useEffect(() => {
+    fetchCharacteristics();
+  }, []);
 
   const fetchCharacteristics = async () => {
     try {
-      const { data } = await axios.get(API_URL,{
+      const { data } = await axios.get(API_URL, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
+      console.log("📢 API Response:", data); // Debug API
       setCharacteristics(data);
     } catch (error) {
-      console.error("Error fetching characteristics:", error);
+      console.error("🚨 Error fetching characteristics:", error.response?.data || error);
     }
   };
 
   const saveCharacteristic = async () => {
+    console.log("📢 Dữ liệu gửi lên API:", editingCharacteristic);
+
+    if (!editingCharacteristic.plantId || !editingCharacteristic.characteristicCategoryId) {
+      console.error("🚨 Error: plantId và characteristicCategoryId không được để trống!");
+      return;
+    }
+
+    const payload = {
+      plantId: editingCharacteristic.plantId,
+      characteristicCategoryId: editingCharacteristic.characteristicCategoryId,
+      description: editingCharacteristic.description || "No description",
+    };
+
     try {
+      let response;
       if (editingCharacteristic.id) {
-        await axios.put(`${API_URL}/${editingCharacteristic.id}`, editingCharacteristic);
+        console.log(`🛠 Gửi PUT API với ID: ${editingCharacteristic.id}`);
+        response = await axios.put(`${API_URL}/${editingCharacteristic.id}`, { 
+          description: editingCharacteristic.description 
+        });
       } else {
-        await axios.post(API_URL, editingCharacteristic);
+        console.log("🛠 Gửi POST API");
+        response = await axios.post(API_URL, payload);
       }
-      fetchCharacteristics();
-      setOpen(false);
-      setEditingCharacteristic({ name: "", description: "" });
+
+      console.log("✅ API Response:", response.data);
+      await fetchCharacteristics();
+      handleCloseDialog();
     } catch (error) {
-      console.error("Error saving characteristic:", error);
+      console.error("🚨 Error saving characteristic:", error.response?.data || error);
     }
   };
 
@@ -50,13 +77,36 @@ const PlantCharacteristicManagement = () => {
       await axios.delete(`${API_URL}/${id}`);
       fetchCharacteristics();
     } catch (error) {
-      console.error("Error deleting characteristic:", error);
+      console.error("🚨 Error deleting characteristic:", error);
     }
   };
 
-  const handleOpenDialog = (char = { name: "", description: "" }) => {
-    setEditingCharacteristic(char);
+  const handleOpenDialog = (char = null) => {
+    setEditingCharacteristic(
+      char
+        ? {
+            id: char.id,
+            plantId: char.plantId || "",
+            characteristicCategoryId: char.characteristicCategoryId || "",
+            description: char.description || "",
+          }
+        : { id: null, plantId: "", characteristicCategoryId: "", description: "" }
+    );
     setOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpen(false);
+    setEditingCharacteristic({ id: null, plantId: "", characteristicCategoryId: "", description: "" });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditingCharacteristic((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    console.log(`📝 Updating ${name}:`, value);
   };
 
   return (
@@ -77,17 +127,19 @@ const PlantCharacteristicManagement = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
+              <TableCell>Plant ID</TableCell>
+              <TableCell>Category ID</TableCell>
               <TableCell>Description</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {characteristics
-              .filter((c) => c.plantName.toLowerCase().includes(search.toLowerCase()))
+              .filter((c) => c.description.toLowerCase().includes(search.toLowerCase()))
               .map((char) => (
                 <TableRow key={char.id}>
-                  <TableCell>{char.plantName}</TableCell>
+                  <TableCell>{char.plantId}</TableCell>
+                  <TableCell>{char.characteristicCategoryId}</TableCell>
                   <TableCell>{char.description}</TableCell>
                   <TableCell>
                     <Button onClick={() => handleOpenDialog(char)}>Edit</Button>
@@ -101,27 +153,37 @@ const PlantCharacteristicManagement = () => {
         </Table>
       </TableContainer>
 
-      <Dialog open={open} onClose={() => setOpen(false)}>
+      <Dialog open={open} onClose={handleCloseDialog}>
         <DialogTitle>{editingCharacteristic.id ? "Edit Characteristic" : "Add Characteristic"}</DialogTitle>
         <DialogContent>
           <TextField
-            label="Name"
+            label="Plant ID"
             fullWidth
             margin="dense"
-            value={editingCharacteristic.plantName}
-            onChange={(e) => setEditingCharacteristic({ ...editingCharacteristic, name: e.target.value })}
+            name="plantId"
+            value={editingCharacteristic.plantId || ""}
+            onChange={handleInputChange}
+          />
+          <TextField
+            label="Category ID"
+            fullWidth
+            margin="dense"
+            name="characteristicCategoryId"
+            value={editingCharacteristic.characteristicCategoryId || ""}
+            onChange={handleInputChange}
           />
           <TextField
             label="Description"
             fullWidth
             margin="dense"
-            value={editingCharacteristic.description}
-            onChange={(e) => setEditingCharacteristic({ ...editingCharacteristic, description: e.target.value })}
+            name="description"
+            value={editingCharacteristic.description || ""}
+            onChange={handleInputChange}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={saveCharacteristic}>Save</Button>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={saveCharacteristic} color="primary">Save</Button>
         </DialogActions>
       </Dialog>
     </div>

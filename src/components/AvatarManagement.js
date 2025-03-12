@@ -48,7 +48,9 @@ const AvatarManagement = () => {
   };
 
   const handleOpenDialog = (avatar = null) => {
-    setEditingAvatar(avatar || { name: "", image: AVATAR_OPTIONS[0] });
+    setEditingAvatar(
+      avatar || { id: "", name: "", imageUrl: AVATAR_OPTIONS[0] }
+    );
     setOpen(true);
   };
 
@@ -58,20 +60,28 @@ const AvatarManagement = () => {
   };
 
   const handleSaveAvatar = async () => {
-    if (!editingAvatar.name || !editingAvatar.image) {
+    if (!editingAvatar.name || !editingAvatar.imageUrl) {
       alert("Name and Avatar Image are required!");
       return;
     }
+    
+    // Kiểm tra avatar hợp lệ
+    if (!AVATAR_OPTIONS.includes(editingAvatar.imageUrl)) {
+      alert("Invalid avatar selection.");
+      return;
+    }
+
     try {
       if (editingAvatar.id) {
-        await axios.put(`${API_URL}/${editingAvatar.id}`, {
+        await axios.put(`${API_URL}`, {
+          id: editingAvatar.id,
           name: editingAvatar.name,
-          image: editingAvatar.image,
+          imageUrl: editingAvatar.imageUrl,
         });
       } else {
         await axios.post(API_URL, {
           name: editingAvatar.name,
-          image: editingAvatar.image,
+          imageUrl: editingAvatar.imageUrl,
         });
       }
       fetchAvatars();
@@ -115,7 +125,7 @@ const AvatarManagement = () => {
               .map((avatar) => (
                 <TableRow key={avatar.id}>
                   <TableCell>
-                    <img src={avatar.image} alt="avatar" width={50} height={50} style={{ borderRadius: "50%" }} />
+                    <img src={avatar.imageUrl} alt="avatar" width={50} height={50} style={{ borderRadius: "50%" }} />
                   </TableCell>
                   <TableCell>{avatar.name}</TableCell>
                   <TableCell>
@@ -144,8 +154,8 @@ const AvatarManagement = () => {
           />
           <Select
             fullWidth
-            value={editingAvatar?.image || AVATAR_OPTIONS[0]}
-            onChange={(e) => setEditingAvatar({ ...editingAvatar, image: e.target.value })}
+            value={editingAvatar?.imageUrl || AVATAR_OPTIONS[0]}
+            onChange={(e) => setEditingAvatar({ ...editingAvatar, imageUrl: e.target.value })}
           >
             {AVATAR_OPTIONS.map((url, index) => (
               <MenuItem key={index} value={url}>
