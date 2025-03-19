@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle, Select, MenuItem, InputLabel, FormControl } from '@mui/material';
+import {
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button,
+  TextField, Dialog, DialogActions, DialogContent, DialogTitle, Select, MenuItem,
+  InputLabel, FormControl
+} from '@mui/material';
 import { BASE_API } from '../constant';
 import ImagePlaceholder from "../assets/placeholder.png";
 
@@ -18,12 +22,16 @@ const BadgeManagement = () => {
   }, []);
 
   const fetchBadges = async () => {
-    const res = await axios.get(API_URL);
-    setBadges(res.data.data.items);
+    try {
+      const res = await axios.get(API_URL);
+      setBadges(res.data.data.items);
+    } catch (error) {
+      console.error("Error fetching badges:", error);
+    }
   };
 
   const handleOpenDialog = (badge = null) => {
-    setEditingBadge(badge || { name: '', type: '', image: '' });
+    setEditingBadge(badge || { name: '', type: '', image: '', conditionalPoint: 0 });
     setOpen(true);
   };
 
@@ -33,18 +41,26 @@ const BadgeManagement = () => {
   };
 
   const handleSaveBadge = async () => {
-    if (editingBadge.id) {
-      await axios.put(`${API_URL}/badge?id=${editingBadge.id}`, editingBadge);
-    } else {
-      await axios.post(`${API_URL}/badge`, editingBadge);
+    try {
+      if (editingBadge.id) {
+        await axios.put(`${API_URL}/badge?id=${editingBadge.id}`, editingBadge);
+      } else {
+        await axios.post(`${API_URL}/badge`, editingBadge);
+      }
+      fetchBadges();
+      handleCloseDialog();
+    } catch (error) {
+      console.error("Error saving badge:", error);
     }
-    fetchBadges();
-    handleCloseDialog();
   };
 
   const handleDelete = async (id) => {
-    await axios.delete(`${API_URL}/badge?id=${id}`);
-    fetchBadges();
+    try {
+      await axios.delete(`${API_URL}/badge?id=${id}`);
+      fetchBadges();
+    } catch (error) {
+      console.error("Error deleting badge:", error);
+    }
   };
 
   const filteredBadges = badges.filter(badge =>
@@ -70,9 +86,9 @@ const BadgeManagement = () => {
           label="Filter by Type"
         >
           <MenuItem value="">All</MenuItem>
-          <MenuItem value="Flower">Gold</MenuItem>
-          <MenuItem value="Bonsai">Silver</MenuItem>
-          <MenuItem value="Garden">Garden</MenuItem>
+          <MenuItem value="Gold">Gold</MenuItem>
+          <MenuItem value="Silver">Silver</MenuItem>
+          <MenuItem value="Bronze">Bronze</MenuItem>
         </Select>
       </FormControl>
       <Button variant="contained" color="primary" onClick={() => handleOpenDialog()}>
@@ -85,15 +101,19 @@ const BadgeManagement = () => {
               <TableCell>Image</TableCell>
               <TableCell>Name</TableCell>
               <TableCell>Type</TableCell>
+              <TableCell>Conditional Points</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredBadges.map(badge => (
               <TableRow key={badge.id}>
-                <TableCell><img src={badge.image ?? ImagePlaceholder} width={50} height={50} alt="badge" /></TableCell>
+                <TableCell>
+                  <img src={badge.image ?? ImagePlaceholder} width={50} height={50} alt="badge" />
+                </TableCell>
                 <TableCell>{badge.name}</TableCell>
                 <TableCell>{badge.type}</TableCell>
+                <TableCell>{badge.conditionalPoint}</TableCell>
                 <TableCell>
                   <Button onClick={() => handleOpenDialog(badge)}>Edit</Button>
                   <Button color="secondary" onClick={() => handleDelete(badge.id)}>Delete</Button>
@@ -107,9 +127,35 @@ const BadgeManagement = () => {
       <Dialog open={open} onClose={handleCloseDialog}>
         <DialogTitle>{editingBadge?.id ? 'Edit Badge' : 'Add Badge'}</DialogTitle>
         <DialogContent>
-          <TextField label="Name" fullWidth margin="dense" value={editingBadge?.name || ''} onChange={(e) => setEditingBadge({ ...editingBadge, name: e.target.value })} />
-          <TextField label="Type" fullWidth margin="dense" value={editingBadge?.type || ''} onChange={(e) => setEditingBadge({ ...editingBadge, type: e.target.value })} />
-          <TextField label="Image URL" fullWidth margin="dense" value={editingBadge?.image || ''} onChange={(e) => setEditingBadge({ ...editingBadge, image: e.target.value })} />
+          <TextField 
+            label="Name" 
+            fullWidth 
+            margin="dense" 
+            value={editingBadge?.name || ''} 
+            onChange={(e) => setEditingBadge({ ...editingBadge, name: e.target.value })} 
+          />
+          <TextField 
+            label="Type" 
+            fullWidth 
+            margin="dense" 
+            value={editingBadge?.type || ''} 
+            onChange={(e) => setEditingBadge({ ...editingBadge, type: e.target.value })} 
+          />
+          <TextField 
+            label="Image URL" 
+            fullWidth 
+            margin="dense" 
+            value={editingBadge?.image || ''} 
+            onChange={(e) => setEditingBadge({ ...editingBadge, image: e.target.value })} 
+          />
+          <TextField
+            label="Conditional Points"
+            type="number"
+            fullWidth
+            margin="dense"
+            value={editingBadge?.conditionalPoint || 0}
+            onChange={(e) => setEditingBadge({ ...editingBadge, conditionalPoint: Number(e.target.value) })}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>

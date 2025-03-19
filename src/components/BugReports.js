@@ -1,0 +1,132 @@
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  TextField,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+} from "@mui/material";
+
+const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/bugreports";
+const CREATE_BUG_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/bugreports/report";
+
+const BugReports = () => {
+  const [bugs, setBugs] = useState([]);
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [newBug, setNewBug] = useState({ name: "", context: "" });
+
+  useEffect(() => {
+    fetchBugs();
+  }, [search]);
+
+  const fetchBugs = () => {
+    axios
+      .get(API_URL, {
+        params: { index: 1, pageSize: 10, nameSearch: search },
+      })
+      .then((response) => {
+        setBugs(response.data?.data?.items || []);
+      })
+      .catch((error) => console.error("Error fetching bug reports:", error));
+  };
+
+  const handleCreateBug = () => {
+    if (!newBug.name || !newBug.context) {
+      alert("Please fill in all fields");
+      return;
+    }
+
+    axios
+      .post(CREATE_BUG_URL, newBug, {
+        headers: { "Content-Type": "application/json" },
+      })
+      .then(() => {
+        fetchBugs();
+        setOpen(false);
+        setNewBug({ name: "", context: "" });
+      })
+      .catch((error) => {
+        console.error("Error creating bug report:", error);
+        alert("Failed to create bug report");
+      });
+  };
+
+  return (
+    <div className="bug-reports-page">
+      <h2>Bug Reports</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
+        <TextField
+          label="Search Bug Reports"
+          variant="outlined"
+          size="small"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <Button variant="contained" color="primary" onClick={() => setOpen(true)}>
+          Report Bug
+        </Button>
+      </div>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Title</TableCell>
+              <TableCell>Created By</TableCell>
+              <TableCell>Created Time</TableCell>
+              <TableCell>Context</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {bugs.map((bug) => (
+              <TableRow key={bug.id}>
+                <TableCell>{bug.name}</TableCell>
+                <TableCell>{bug.createdBy}</TableCell>
+                <TableCell>{bug.createdTime}</TableCell>
+                <TableCell>{bug.context}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Dialog for Creating Bug Report */}
+      <Dialog open={open} onClose={() => setOpen(false)}>
+        <DialogTitle>Report a Bug</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Bug Title"
+            fullWidth
+            margin="dense"
+            value={newBug.name}
+            onChange={(e) => setNewBug({ ...newBug, name: e.target.value })}
+          />
+          <TextField
+            label="Bug Description"
+            fullWidth
+            margin="dense"
+            multiline
+            rows={4}
+            value={newBug.context}
+            onChange={(e) => setNewBug({ ...newBug, context: e.target.value })}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={handleCreateBug} color="primary">Submit</Button>
+        </DialogActions>
+      </Dialog>
+    </div>
+  );
+};
+
+export default BugReports;

@@ -1,81 +1,148 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TextField, Button, IconButton, Avatar, Box, Typography, AppBar, Toolbar, TablePagination } from '@mui/material';
-import { Edit, Delete } from '@mui/icons-material';
-import { BASE_API } from '../constant';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TextField,
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle
+} from "@mui/material";
+import { Edit, Delete, Add } from "@mui/icons-material";
+import { BASE_API } from "../constant";
 
-const API_URL = BASE_API + '/users';
+const API_URL = BASE_API + "/users";
+const CREATE_STAFF_URL = BASE_API + "/users/staff";
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", confirmPassword: "", age: 0 });
+  const [selectedUser, setSelectedUser] = useState({ id: "", name: "", age: 0, phoneNumber: "", avatarUrl: "" });
 
   useEffect(() => {
     fetchUsers();
-  }, [page, rowsPerPage]);
+  }, []);
 
-  const fetchUsers = (query = '') => {
+  const fetchUsers = (query = "") => {
     axios.get(API_URL, {
-      params: { index: page + 1, pageSize: rowsPerPage, nameSearch: query },
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-      },
+      params: { index: 1, pageSize: 10, nameSearch: query },
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
-    .then(response => {
-      setUsers(Array.isArray(response.data?.data?.items) ? response.data.data.items : []);
+    .then(response => setUsers(response.data?.data?.items || []))
+    .catch(error => console.error("Error fetching users:", error));
+  };
+
+  const handleCreateStaff = () => {
+    if (!newUser.name || !newUser.email || !newUser.password || !newUser.confirmPassword || !newUser.age) {
+      alert("Please fill all fields!");
+      return;
+    }
+    if (!/[A-Z]/.test(newUser.password)) {
+      alert("Password must contain at least one uppercase letter!");
+      return;
+    }
+    if (newUser.password !== newUser.confirmPassword) {
+      alert("Passwords do not match!");
+      return;
+    }
+
+    axios.post(CREATE_STAFF_URL, newUser, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" }
     })
-    .catch(error => console.error('Error fetching users:', error));
+    .then(() => {
+      fetchUsers();
+      setOpen(false);
+      setNewUser({ name: "", email: "", password: "", confirmPassword: "", age: 0 });
+    })
+    .catch(error => alert("Failed to create staff! " + (error.response?.data?.message || "Server error")));
+  };
+
+  const handleEditClick = (user) => {
+    setSelectedUser(user);
+    setEditOpen(true);
+  };
+
+  const handleUpdateUser = () => {
+    axios.put(`${API_URL}/user?id=${selectedUser.id}`, selectedUser, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    })
+    .then(() => {
+      fetchUsers();
+      setEditOpen(false);
+    })
+    .catch(error => alert("Update failed: " + (error.response?.data?.message || "Server error")));
   };
 
   return (
     <div className="user-management-page">
-      <AppBar position="static" color="default">
-        <Toolbar>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar sx={{ width: 50, height: 50 }} />
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'green', marginLeft: '10px' }}>Đại Dương</Typography>
-          </Box>
-        </Toolbar>
-      </AppBar>
+      <TextField label="Search..." variant="outlined" size="small" value={search} onChange={(e) => {
+        setSearch(e.target.value);
+        if (e.target.value === "") fetchUsers();
+      }} />
+      <Button variant="contained" color="primary" onClick={() => fetchUsers(search)}>Search</Button>
+      <Button variant="contained" color="success" startIcon={<Add />} onClick={() => setOpen(true)}>Create Staff</Button>
 
-      <Box sx={{ padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '10px', marginTop: '20px' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <TextField label="Search..." variant="outlined" size="small" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <Button variant="contained" color="primary">Search</Button>
-        </Box>
-
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Registration Date</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell>Actions</TableCell>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Registration Date</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {users.map(user => (
+              <TableRow key={user.id}>
+                <TableCell>{user.name}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>{user.createdTime}</TableCell>
+                <TableCell>{user.status === 1 ? "ACTIVE" : "LOCKED"}</TableCell>
+                <TableCell>
+                  <IconButton color="primary" onClick={() => handleEditClick(user)}>
+                    <Edit fontSize="small" />
+                  </IconButton>
+                  <IconButton color="error">
+                    <Delete fontSize="small" />
+                  </IconButton>
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {users.map(user => (
-                <TableRow key={user.id}>
-                  <TableCell>{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.createdTime}</TableCell>
-                  <TableCell>{user.status === 1 ? 'ACTIVE' : 'LOCKED'}</TableCell>
-                  <TableCell>{user.role}</TableCell>
-                  <TableCell>
-                    <IconButton color="primary"><Edit fontSize="small" /></IconButton>
-                    <IconButton color="error"><Delete fontSize="small" /></IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Box>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Create Staff Dialog */}
+      <Dialog open={open} onClose={() => setOpen(false)}>
+        <DialogTitle>Create Staff</DialogTitle>
+        <DialogContent>
+          <TextField label="Name" fullWidth margin="dense" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
+          <TextField label="Email" fullWidth margin="dense" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+          <TextField label="Password" fullWidth margin="dense" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+          <TextField label="Confirm Password" fullWidth margin="dense" type="password" value={newUser.confirmPassword} onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })} />
+          <TextField label="Age" fullWidth margin="dense" type="number" value={newUser.age} onChange={(e) => setNewUser({ ...newUser, age: Number(e.target.value) })} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={handleCreateStaff} color="primary">Create</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)}>
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogContent>
+          <TextField label="Name" fullWidth margin="dense" value={selectedUser.name} onChange={(e) => setSelectedUser({ ...selectedUser, name: e.target.value })} />
+          <TextField label="Age" fullWidth margin="dense" type="number" value={selectedUser.age} onChange={(e) => setSelectedUser({ ...selectedUser, age: Number(e.target.value) })} />
+          <TextField label="Phone Number" fullWidth margin="dense" value={selectedUser.phoneNumber} onChange={(e) => setSelectedUser({ ...selectedUser, phoneNumber: e.target.value })} />
+          <TextField label="Avatar URL" fullWidth margin="dense" value={selectedUser.avatarUrl} onChange={(e) => setSelectedUser({ ...selectedUser, avatarUrl: e.target.value })} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+          <Button onClick={handleUpdateUser} color="primary">Update</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

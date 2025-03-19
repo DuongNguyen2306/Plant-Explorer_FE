@@ -1,26 +1,58 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
+import { Card, CardContent, Typography, Button, Grid, Box } from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
+
+const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/options";
 
 const OptionManagement = () => {
-  const { quizId, questionId } = useParams();
+  const { questionId } = useParams();
   const [options, setOptions] = useState([]);
 
   useEffect(() => {
-    axios.get(`https://66937520c6be000fa07b9d27.mockapi.io/quizzes/${quizId}`)
-      .then(res => setOptions(res.data.questions[questionId].options));
-  }, [quizId, questionId]);
+    fetchOptions();
+  }, [questionId]);
+
+  const fetchOptions = async () => {
+    try {
+      const res = await axios.get(`${API_URL}?questionId=${questionId}`);
+      setOptions(res.data?.data?.items || []);
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách tùy chọn:", error);
+    }
+  };
 
   return (
-    <div>
-      <h1>Option Management for Question {questionId}</h1>
-      <button onClick={() => {/* Add new Option */}}>Add Option</button>
-      <ul>
-        {options.map((option, index) => (
-          <li key={index}>{option.text} - {option.isCorrect ? "✅" : "❌"}</li>
+    <Box sx={{ padding: 4, backgroundColor: "#e3eafc", minHeight: "100vh" }}>
+      <Typography variant="h4" fontWeight="bold" gutterBottom>
+        Option Management
+      </Typography>
+
+      <Button onClick={fetchOptions} variant="contained" color="primary" sx={{ marginBottom: 3 }}>
+        REFRESH
+      </Button>
+
+      <Grid container spacing={3}>
+        {options.map((option) => (
+          <Grid item xs={12} sm={6} md={4} key={option.id}>
+            <Card sx={{ borderRadius: 3, boxShadow: 3, textAlign: "center", padding: 2 }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold">
+                  {option.text || "No Text"}
+                </Typography>
+                {option.correct ? (
+                  <CheckCircleIcon color="success" sx={{ fontSize: 40, marginTop: 1 }} />
+                ) : (
+                  <CancelIcon color="error" sx={{ fontSize: 40, marginTop: 1 }} />
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
         ))}
-      </ul>
-    </div>
+      </Grid>
+    </Box>
   );
 };
 
