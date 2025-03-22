@@ -1,21 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Button,
-  TextField,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Box,
-  Typography,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
+  Button, TextField, TablePagination, Box, Typography
 } from "@mui/material";
 import { BASE_API } from "../constant";
 import { useNavigate } from "react-router-dom";
@@ -24,9 +11,9 @@ const API_URL = BASE_API + "/plant";
 
 const PlantManagement = () => {
   const [plants, setPlants] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [editingPlant, setEditingPlant] = useState(null);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(5);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,21 +31,13 @@ const PlantManagement = () => {
     }
   };
 
-  const handleViewDetails = (plantId, type) => {
-    switch (type) {
-      case "characteristic":
-        navigate(`/plant/${plantId}/characteristics`);
-        break;
-      case "category":
-        navigate(`/plant/${plantId}/category`);
-        break;
-      case "application":
-        navigate(`/plant/${plantId}/applications`);
-        break;
-      default:
-        break;
-    }
+  const handleViewDetail = (plantId) => {
+    navigate(`/plant/${plantId}/detail`);
   };
+
+  const filteredPlants = plants.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <Box sx={{ padding: "20px" }}>
@@ -87,26 +66,28 @@ const PlantManagement = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {plants.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map((plant) => (
+            {filteredPlants.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((plant) => (
               <TableRow key={plant.id}>
                 <TableCell>{plant.name}</TableCell>
                 <TableCell>{plant.scientificName}</TableCell>
                 <TableCell>{plant.category}</TableCell>
                 <TableCell>
-                  <Button color="primary" onClick={() => handleViewDetails(plant.id, "characteristic")}>
-                    View Characteristics
-                  </Button>
-                  <Button color="secondary" onClick={() => handleViewDetails(plant.id, "category")}>
-                    View Category
-                  </Button>
-                  <Button color="success" onClick={() => handleViewDetails(plant.id, "application")}>
-                    View Applications
+                  <Button variant="outlined" color="info" onClick={() => handleViewDetail(plant.id)}>
+                    View Detail
                   </Button>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          count={filteredPlants.length}
+          page={page}
+          onPageChange={(e, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          rowsPerPageOptions={[5]}
+        />
       </TableContainer>
     </Box>
   );

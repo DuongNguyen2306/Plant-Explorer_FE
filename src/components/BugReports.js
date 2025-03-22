@@ -14,6 +14,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  TablePagination
 } from "@mui/material";
 
 const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/bugreports";
@@ -24,18 +25,26 @@ const BugReports = () => {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [newBug, setNewBug] = useState({ name: "", context: "" });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(5);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     fetchBugs();
-  }, [search]);
+  }, [search, page]);
 
   const fetchBugs = () => {
     axios
       .get(API_URL, {
-        params: { index: 1, pageSize: 10, nameSearch: search },
+        params: {
+          index: page + 1,
+          pageSize: rowsPerPage,
+          nameSearch: search
+        }
       })
       .then((response) => {
         setBugs(response.data?.data?.items || []);
+        setTotalCount(response.data?.data?.totalCount || 0);
       })
       .catch((error) => console.error("Error fetching bug reports:", error));
   };
@@ -61,8 +70,12 @@ const BugReports = () => {
       });
   };
 
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
   return (
-    <div className="bug-reports-page">
+    <div className="bug-reports-page" style={{ padding: 20 }}>
       <h2>Bug Reports</h2>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
         <TextField
@@ -70,12 +83,16 @@ const BugReports = () => {
           variant="outlined"
           size="small"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0); // Reset page when search changes
+          }}
         />
         <Button variant="contained" color="primary" onClick={() => setOpen(true)}>
           Report Bug
         </Button>
       </div>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -97,6 +114,16 @@ const BugReports = () => {
             ))}
           </TableBody>
         </Table>
+
+        <TablePagination
+          component="div"
+          count={totalCount}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          rowsPerPageOptions={[5]}
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
+        />
       </TableContainer>
 
       {/* Dialog for Creating Bug Report */}

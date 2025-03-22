@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TextField,
-  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TablePagination
 } from "@mui/material";
 import { Edit, Delete, Add } from "@mui/icons-material";
 import { BASE_API } from "../constant";
@@ -18,16 +18,27 @@ const UserManagement = () => {
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "", confirmPassword: "", age: 0 });
   const [selectedUser, setSelectedUser] = useState({ id: "", name: "", age: 0, phoneNumber: "", avatarUrl: "" });
 
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(5);
+  const [totalUsers, setTotalUsers] = useState(0);
+
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    fetchUsers(search);
+  }, [page]);
 
   const fetchUsers = (query = "") => {
     axios.get(API_URL, {
-      params: { index: 1, pageSize: 10, nameSearch: query },
+      params: {
+        index: page + 1,           // API bắt đầu từ 1
+        pageSize: rowsPerPage,
+        nameSearch: query
+      },
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
-    .then(response => setUsers(response.data?.data?.items || []))
+    .then(response => {
+      setUsers(response.data?.data?.items || []);
+      setTotalUsers(response.data?.data?.totalCount || 0);
+    })
     .catch(error => console.error("Error fetching users:", error));
   };
 
@@ -73,15 +84,26 @@ const UserManagement = () => {
   };
 
   return (
-    <div className="user-management-page">
-      <TextField label="Search..." variant="outlined" size="small" value={search} onChange={(e) => {
-        setSearch(e.target.value);
-        if (e.target.value === "") fetchUsers();
-      }} />
-      <Button variant="contained" color="primary" onClick={() => fetchUsers(search)}>Search</Button>
-      <Button variant="contained" color="success" startIcon={<Add />} onClick={() => setOpen(true)}>Create Staff</Button>
+    <div className="user-management-page" style={{ padding: 20 }}>
+      <TextField
+        label="Search..."
+        variant="outlined"
+        size="small"
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          if (e.target.value === "") fetchUsers();
+        }}
+        style={{ marginRight: 10 }}
+      />
+      <Button variant="contained" color="primary" onClick={() => fetchUsers(search)} style={{ marginRight: 10 }}>
+        Search
+      </Button>
+      <Button variant="contained" color="success" startIcon={<Add />} onClick={() => setOpen(true)}>
+        Create Staff
+      </Button>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} style={{ marginTop: 20 }}>
         <Table>
           <TableHead>
             <TableRow>
@@ -111,6 +133,15 @@ const UserManagement = () => {
             ))}
           </TableBody>
         </Table>
+
+        <TablePagination
+          component="div"
+          count={totalUsers}
+          page={page}
+          onPageChange={(e, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          rowsPerPageOptions={[5]}
+        />
       </TableContainer>
 
       {/* Create Staff Dialog */}

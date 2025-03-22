@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button,
   TextField, Dialog, DialogActions, DialogContent, DialogTitle, Select, MenuItem,
-  InputLabel, FormControl
+  InputLabel, FormControl, TablePagination
 } from '@mui/material';
 import { BASE_API } from '../constant';
 import ImagePlaceholder from "../assets/placeholder.png";
@@ -16,6 +16,8 @@ const BadgeManagement = () => {
   const [editingBadge, setEditingBadge] = useState(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(5); // cố định 5 hàng mỗi trang
 
   useEffect(() => {
     fetchBadges();
@@ -68,13 +70,22 @@ const BadgeManagement = () => {
     (!typeFilter || badge.type === typeFilter)
   );
 
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const paginatedBadges = filteredBadges.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
   return (
     <div>
       <h2>Badge Management</h2>
       <TextField
         label="Search by Name"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setPage(0); // reset về trang đầu khi tìm kiếm
+        }}
         variant="outlined"
         style={{ marginRight: '1rem', marginBottom: '1rem' }}
       />
@@ -82,7 +93,10 @@ const BadgeManagement = () => {
         <InputLabel>Filter by Type</InputLabel>
         <Select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={(e) => {
+            setTypeFilter(e.target.value);
+            setPage(0);
+          }}
           label="Filter by Type"
         >
           <MenuItem value="">All</MenuItem>
@@ -106,10 +120,10 @@ const BadgeManagement = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredBadges.map(badge => (
+            {paginatedBadges.map(badge => (
               <TableRow key={badge.id}>
                 <TableCell>
-                  <img src={badge.image ?? ImagePlaceholder} width={50} height={50} alt="badge" />
+                  <img src={badge.image || ImagePlaceholder} width={50} height={50} alt="badge" />
                 </TableCell>
                 <TableCell>{badge.name}</TableCell>
                 <TableCell>{badge.type}</TableCell>
@@ -122,31 +136,39 @@ const BadgeManagement = () => {
             ))}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          count={filteredBadges.length}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          rowsPerPageOptions={[5]}
+        />
       </TableContainer>
 
       <Dialog open={open} onClose={handleCloseDialog}>
         <DialogTitle>{editingBadge?.id ? 'Edit Badge' : 'Add Badge'}</DialogTitle>
         <DialogContent>
-          <TextField 
-            label="Name" 
-            fullWidth 
-            margin="dense" 
-            value={editingBadge?.name || ''} 
-            onChange={(e) => setEditingBadge({ ...editingBadge, name: e.target.value })} 
+          <TextField
+            label="Name"
+            fullWidth
+            margin="dense"
+            value={editingBadge?.name || ''}
+            onChange={(e) => setEditingBadge({ ...editingBadge, name: e.target.value })}
           />
-          <TextField 
-            label="Type" 
-            fullWidth 
-            margin="dense" 
-            value={editingBadge?.type || ''} 
-            onChange={(e) => setEditingBadge({ ...editingBadge, type: e.target.value })} 
+          <TextField
+            label="Type"
+            fullWidth
+            margin="dense"
+            value={editingBadge?.type || ''}
+            onChange={(e) => setEditingBadge({ ...editingBadge, type: e.target.value })}
           />
-          <TextField 
-            label="Image URL" 
-            fullWidth 
-            margin="dense" 
-            value={editingBadge?.image || ''} 
-            onChange={(e) => setEditingBadge({ ...editingBadge, image: e.target.value })} 
+          <TextField
+            label="Image URL"
+            fullWidth
+            margin="dense"
+            value={editingBadge?.image || ''}
+            onChange={(e) => setEditingBadge({ ...editingBadge, image: e.target.value })}
           />
           <TextField
             label="Conditional Points"

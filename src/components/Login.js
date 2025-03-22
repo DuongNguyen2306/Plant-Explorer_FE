@@ -100,7 +100,7 @@ const handleRegister = async (e) => {
             <div className="toggle-panel toggle-right">
               <h1>Hello, Friend!</h1>
               <p>Enter your details and start your journey with us</p>
-              <button className="hidden" onClick={() => setIsRegistering(true)}>Sign Up</button>
+              
             </div>
           </div>
         </div>
