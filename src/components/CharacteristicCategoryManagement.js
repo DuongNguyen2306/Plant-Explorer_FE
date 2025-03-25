@@ -1,3 +1,4 @@
+// 📁 components/CharacteristicCategoryManagement.js (Staff only)
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
@@ -6,6 +7,7 @@ import {
   Dialog, DialogActions, DialogContent, DialogTitle
 } from "@mui/material";
 import { BASE_API } from "../constant";
+import { getUserRoleFromAPI } from "../utils/roleUtils";
 
 const API_URL = BASE_API + "/characteristiccategory";
 
@@ -13,9 +15,16 @@ const CharacteristicCategoryManagement = () => {
   const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [role, setRole] = useState(null);
   const [editingCategory, setEditingCategory] = useState({ name: "", description: "" });
 
-  useEffect(() => { fetchCategories(); }, []);
+  useEffect(() => {
+    getUserRoleFromAPI().then(setRole);
+  }, []);
+
+  useEffect(() => {
+    if (role === "staff") fetchCategories();
+  }, [role]);
 
   const fetchCategories = async () => {
     try {
@@ -54,6 +63,9 @@ const CharacteristicCategoryManagement = () => {
     setEditingCategory(category);
     setOpen(true);
   };
+
+  if (role === null) return <p>Loading...</p>;
+  if (role !== "staff") return <p style={{ color: 'red' }}>You do not have permission to manage characteristic categories.</p>;
 
   return (
     <div>

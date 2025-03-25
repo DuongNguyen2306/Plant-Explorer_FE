@@ -6,11 +6,13 @@ import {
 } from "@mui/material";
 import { Edit, Delete, Add } from "@mui/icons-material";
 import { BASE_API } from "../constant";
+import { getUserRoleFromAPI } from "../utils/roleUtils";
 
 const API_URL = BASE_API + "/users";
 const CREATE_STAFF_URL = BASE_API + "/users/staff";
 
 const UserManagement = () => {
+  const [role, setRole] = useState(null);
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -23,13 +25,17 @@ const UserManagement = () => {
   const [totalUsers, setTotalUsers] = useState(0);
 
   useEffect(() => {
-    fetchUsers(search);
-  }, [page]);
+    getUserRoleFromAPI().then(setRole);
+  }, []);
+
+  useEffect(() => {
+    if (role === "admin") fetchUsers(search);
+  }, [page, role]);
 
   const fetchUsers = (query = "") => {
     axios.get(API_URL, {
       params: {
-        index: page + 1,           // API bắt đầu từ 1
+        index: page + 1,
         pageSize: rowsPerPage,
         nameSearch: query
       },
@@ -82,6 +88,9 @@ const UserManagement = () => {
     })
     .catch(error => alert("Update failed: " + (error.response?.data?.message || "Server error")));
   };
+
+  if (role === null) return <p>Loading permissions...</p>;
+  if (role !== "admin") return <p style={{ color: "red" }}>You do not have permission to view this page.</p>;
 
   return (
     <div className="user-management-page" style={{ padding: 20 }}>

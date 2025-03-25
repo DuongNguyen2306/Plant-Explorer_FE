@@ -6,13 +6,15 @@ import {
   Dialog, DialogActions, DialogContent, DialogTitle
 } from "@mui/material";
 import { BASE_API } from "../constant";
+import { getUserRoleFromAPI } from "../utils/roleUtils";
 
-const API_URL = BASE_API + "/plantcharacteristic"; // ⚠ Kiểm tra đường dẫn API chính xác
+const API_URL = BASE_API + "/plantcharacteristic";
 
 const PlantCharacteristicManagement = () => {
   const [characteristics, setCharacteristics] = useState([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [role, setRole] = useState(null);
   const [editingCharacteristic, setEditingCharacteristic] = useState({
     id: null,
     plantId: "",
@@ -21,8 +23,12 @@ const PlantCharacteristicManagement = () => {
   });
 
   useEffect(() => {
-    fetchCharacteristics();
+    getUserRoleFromAPI().then(setRole);
   }, []);
+
+  useEffect(() => {
+    if (role === "staff" || role === "children") fetchCharacteristics();
+  }, [role]);
 
   const fetchCharacteristics = async () => {
     try {
@@ -31,7 +37,6 @@ const PlantCharacteristicManagement = () => {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
-      console.log("📢 API Response:", data); // Debug API
       setCharacteristics(data);
     } catch (error) {
       console.error("🚨 Error fetching characteristics:", error.response?.data || error);
@@ -39,8 +44,6 @@ const PlantCharacteristicManagement = () => {
   };
 
   const saveCharacteristic = async () => {
-    console.log("📢 Dữ liệu gửi lên API:", editingCharacteristic);
-
     if (!editingCharacteristic.plantId || !editingCharacteristic.characteristicCategoryId) {
       console.error("🚨 Error: plantId và characteristicCategoryId không được để trống!");
       return;
@@ -55,16 +58,12 @@ const PlantCharacteristicManagement = () => {
     try {
       let response;
       if (editingCharacteristic.id) {
-        console.log(`🛠 Gửi PUT API với ID: ${editingCharacteristic.id}`);
         response = await axios.put(`${API_URL}/${editingCharacteristic.id}`, { 
           description: editingCharacteristic.description 
         });
       } else {
-        console.log("🛠 Gửi POST API");
         response = await axios.post(API_URL, payload);
       }
-
-      console.log("✅ API Response:", response.data);
       await fetchCharacteristics();
       handleCloseDialog();
     } catch (error) {
@@ -106,8 +105,10 @@ const PlantCharacteristicManagement = () => {
       ...prev,
       [name]: value,
     }));
-    console.log(`📝 Updating ${name}:`, value);
   };
+
+  if (role === null) return <p>Loading...</p>;
+  if (role !== "staff" && role !== "children") return <p style={{ color: 'red' }}>You do not have permission to view plant characteristics.</p>;
 
   return (
     <div>
@@ -119,9 +120,11 @@ const PlantCharacteristicManagement = () => {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      <Button variant="contained" onClick={() => handleOpenDialog()} style={{ marginBottom: 20 }}>
-        Add Characteristic
-      </Button>
+      {role === "staff" && (
+        <Button variant="contained" onClick={() => handleOpenDialog()} style={{ marginBottom: 20 }}>
+          Add Characteristic
+        </Button>
+      )}
 
       <TableContainer component={Paper}>
         <Table>
@@ -130,7 +133,7 @@ const PlantCharacteristicManagement = () => {
               <TableCell>Plant ID</TableCell>
               <TableCell>Category ID</TableCell>
               <TableCell>Description</TableCell>
-              <TableCell>Actions</TableCell>
+              {role === "staff" && <TableCell>Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -141,51 +144,55 @@ const PlantCharacteristicManagement = () => {
                   <TableCell>{char.plantId}</TableCell>
                   <TableCell>{char.characteristicCategoryId}</TableCell>
                   <TableCell>{char.description}</TableCell>
-                  <TableCell>
-                    <Button onClick={() => handleOpenDialog(char)}>Edit</Button>
-                    <Button color="error" onClick={() => deleteCharacteristic(char.id)}>
-                      Delete
-                    </Button>
-                  </TableCell>
+                  {role === "staff" && (
+                    <TableCell>
+                      <Button onClick={() => handleOpenDialog(char)}>Edit</Button>
+                      <Button color="error" onClick={() => deleteCharacteristic(char.id)}>
+                        Delete
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
           </TableBody>
         </Table>
       </TableContainer>
 
-      <Dialog open={open} onClose={handleCloseDialog}>
-        <DialogTitle>{editingCharacteristic.id ? "Edit Characteristic" : "Add Characteristic"}</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="Plant ID"
-            fullWidth
-            margin="dense"
-            name="plantId"
-            value={editingCharacteristic.plantId || ""}
-            onChange={handleInputChange}
-          />
-          <TextField
-            label="Category ID"
-            fullWidth
-            margin="dense"
-            name="characteristicCategoryId"
-            value={editingCharacteristic.characteristicCategoryId || ""}
-            onChange={handleInputChange}
-          />
-          <TextField
-            label="Description"
-            fullWidth
-            margin="dense"
-            name="description"
-            value={editingCharacteristic.description || ""}
-            onChange={handleInputChange}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={saveCharacteristic} color="primary">Save</Button>
-        </DialogActions>
-      </Dialog>
+      {role === "staff" && (
+        <Dialog open={open} onClose={handleCloseDialog}>
+          <DialogTitle>{editingCharacteristic.id ? "Edit Characteristic" : "Add Characteristic"}</DialogTitle>
+          <DialogContent>
+            <TextField
+              label="Plant ID"
+              fullWidth
+              margin="dense"
+              name="plantId"
+              value={editingCharacteristic.plantId || ""}
+              onChange={handleInputChange}
+            />
+            <TextField
+              label="Category ID"
+              fullWidth
+              margin="dense"
+              name="characteristicCategoryId"
+              value={editingCharacteristic.characteristicCategoryId || ""}
+              onChange={handleInputChange}
+            />
+            <TextField
+              label="Description"
+              fullWidth
+              margin="dense"
+              name="description"
+              value={editingCharacteristic.description || ""}
+              onChange={handleInputChange}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Cancel</Button>
+            <Button onClick={saveCharacteristic} color="primary">Save</Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </div>
   );
 };

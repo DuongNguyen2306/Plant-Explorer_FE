@@ -1,3 +1,4 @@
+// 📁 components/ApplicationCategoryManagement.js (Only staff allowed)
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
@@ -6,6 +7,7 @@ import {
   Dialog, DialogActions, DialogContent, DialogTitle
 } from "@mui/material";
 import { BASE_API } from "../constant";
+import { getUserRoleFromAPI } from "../utils/roleUtils";
 
 const API_URL = BASE_API + "/applicationcategory";
 
@@ -14,11 +16,18 @@ const ApplicationCategoryManagement = () => {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState({ name: "", description: "" });
+  const [role, setRole] = useState(null);
 
-  useEffect(() => { fetchCategories(); }, []);
+  useEffect(() => {
+    getUserRoleFromAPI().then(setRole);
+  }, []);
+
+  useEffect(() => {
+    if (role === "staff") fetchCategories();
+  }, [role]);
 
   const fetchCategories = async () => {
-    const { data } = await axios.get(API_URL,{
+    const { data } = await axios.get(API_URL, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -41,6 +50,9 @@ const ApplicationCategoryManagement = () => {
     await axios.delete(`${API_URL}/${id}`);
     fetchCategories();
   };
+
+  if (role === null) return <p>Loading...</p>;
+  if (role !== "staff") return <p style={{ color: 'red' }}>You do not have permission to manage application categories.</p>;
 
   return (
     <div>

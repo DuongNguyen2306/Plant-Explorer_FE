@@ -2,29 +2,19 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Box,
-  Typography,
-  Button,
-  Grid,
-  Card,
-  CardContent,
-  CardMedia,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  TextField,
-  DialogActions,
-  Pagination,
+  Box, Typography, Button, Grid, Card, CardContent, CardMedia,
+  IconButton, Dialog, DialogTitle, DialogContent, TextField, DialogActions, Pagination,
 } from "@mui/material";
 import { Edit, Delete } from "@mui/icons-material";
 import ImagePlaceholder from "../assets/placeholder.png";
+import { getUserRoleFromAPI } from "../utils/roleUtils";
 
 const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/questions";
 
 const QuestionManagement = () => {
   const { quizId } = useParams();
   const navigate = useNavigate();
+  const [role, setRole] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [page, setPage] = useState(1);
   const [editingQuestion, setEditingQuestion] = useState(null);
@@ -32,8 +22,12 @@ const QuestionManagement = () => {
   const pageSize = 6;
 
   useEffect(() => {
-    fetchQuestions();
-  }, [quizId]);
+    getUserRoleFromAPI().then(setRole);
+  }, []);
+
+  useEffect(() => {
+    if (role === "staff" || role === "children") fetchQuestions();
+  }, [role, quizId]);
 
   const fetchQuestions = async () => {
     try {
@@ -82,20 +76,25 @@ const QuestionManagement = () => {
 
   const paginatedData = questions.slice((page - 1) * pageSize, page * pageSize);
 
+  if (role === null) return <p>Loading...</p>;
+  if (role !== "staff" && role !== "children") return <p style={{ color: "red" }}>You do not have permission to view questions.</p>;
+
   return (
     <Box sx={{ padding: 4, backgroundColor: "#e3eafc", minHeight: "100vh" }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         Question Management
       </Typography>
 
-      <Box sx={{ display: "flex", gap: 2, marginBottom: 3 }}>
-        <Button variant="contained" color="success" onClick={() => handleOpenDialog()}>
-          ADD QUESTION
-        </Button>
-        <Button onClick={fetchQuestions} variant="contained" color="primary">
-          REFRESH
-        </Button>
-      </Box>
+      {role === "staff" && (
+        <Box sx={{ display: "flex", gap: 2, marginBottom: 3 }}>
+          <Button variant="contained" color="success" onClick={() => handleOpenDialog()}>
+            ADD QUESTION
+          </Button>
+          <Button onClick={fetchQuestions} variant="contained" color="primary">
+            REFRESH
+          </Button>
+        </Box>
+      )}
 
       <Grid container spacing={3}>
         {paginatedData.map((question) => (
@@ -125,14 +124,16 @@ const QuestionManagement = () => {
                   >
                     OPTIONS
                   </Button>
-                  <Box>
-                    <IconButton color="info" onClick={() => handleOpenDialog(question)}>
-                      <Edit />
-                    </IconButton>
-                    <IconButton color="error" onClick={() => handleDelete(question.id)}>
-                      <Delete />
-                    </IconButton>
-                  </Box>
+                  {role === "staff" && (
+                    <Box>
+                      <IconButton color="info" onClick={() => handleOpenDialog(question)}>
+                        <Edit />
+                      </IconButton>
+                      <IconButton color="error" onClick={() => handleDelete(question.id)}>
+                        <Delete />
+                      </IconButton>
+                    </Box>
+                  )}
                 </Box>
               </CardContent>
             </Card>
@@ -148,45 +149,46 @@ const QuestionManagement = () => {
         />
       </Box>
 
-      {/* Dialog Add/Edit */}
-      <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>{editingQuestion?.id ? "Edit Question" : "Add Question"}</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Name"
-            margin="dense"
-            value={editingQuestion?.name || ""}
-            onChange={(e) => setEditingQuestion({ ...editingQuestion, name: e.target.value })}
-          />
-          <TextField
-            fullWidth
-            label="Context"
-            margin="dense"
-            value={editingQuestion?.context || ""}
-            onChange={(e) => setEditingQuestion({ ...editingQuestion, context: e.target.value })}
-          />
-          <TextField
-            fullWidth
-            label="Image URL"
-            margin="dense"
-            value={editingQuestion?.imageUrl || ""}
-            onChange={(e) => setEditingQuestion({ ...editingQuestion, imageUrl: e.target.value })}
-          />
-          <TextField
-            fullWidth
-            label="Point"
-            type="number"
-            margin="dense"
-            value={editingQuestion?.point || 0}
-            onChange={(e) => setEditingQuestion({ ...editingQuestion, point: parseInt(e.target.value) })}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSave} color="primary">Save</Button>
-        </DialogActions>
-      </Dialog>
+      {role === "staff" && (
+        <Dialog open={openDialog} onClose={handleCloseDialog}>
+          <DialogTitle>{editingQuestion?.id ? "Edit Question" : "Add Question"}</DialogTitle>
+          <DialogContent>
+            <TextField
+              fullWidth
+              label="Name"
+              margin="dense"
+              value={editingQuestion?.name || ""}
+              onChange={(e) => setEditingQuestion({ ...editingQuestion, name: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="Context"
+              margin="dense"
+              value={editingQuestion?.context || ""}
+              onChange={(e) => setEditingQuestion({ ...editingQuestion, context: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="Image URL"
+              margin="dense"
+              value={editingQuestion?.imageUrl || ""}
+              onChange={(e) => setEditingQuestion({ ...editingQuestion, imageUrl: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="Point"
+              type="number"
+              margin="dense"
+              value={editingQuestion?.point || 0}
+              onChange={(e) => setEditingQuestion({ ...editingQuestion, point: parseInt(e.target.value) })}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Cancel</Button>
+            <Button onClick={handleSave} color="primary">Save</Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 };

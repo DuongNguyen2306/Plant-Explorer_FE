@@ -1,0 +1,150 @@
+/* 📁 css/QuizManagement.css */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* Container chính bao gồm sidebar và nội dung */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 250px; /* Chiều rộng cố định cho sidebar */
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-right: 1px solid #dfe6e9;
+}
+
+/* Nội dung chính */
+.quiz-management-container {
+  flex: 1; /* Chiếm toàn bộ không gian còn lại */
+  background: linear-gradient(135deg, #e0f7fa 0%, #b9fbc0 100%);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header Section */
+.quiz-management-header {
+  padding: 20px 40px;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Quiz Cards Section */
+.quiz-list-container {
+  padding: 40px;
+  flex: 1;
+}
+
+/* Card */
+.quiz-card {
+  border-radius: 15px !important;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.3s ease !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important; /* Đảm bảo thẻ có chiều cao đồng đều */
+}
+
+.quiz-card:hover {
+  transform: scale(1.02) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+}
+
+.quiz-card img {
+  height: 400px !important; /* Chiều cao hình ảnh */
+  object-fit: cover !important; /* Đảm bảo hình ảnh không bị méo */
+  width: 100% !important;
+}
+
+.quiz-card-content {
+  padding: 20px !important;
+  flex-grow: 1 !important;
+}
+
+.quiz-card-content h5 {
+  font-size: 20px !important; /* Kích thước font tiêu đề */
+  font-weight: 600 !important;
+  color: #2d3436 !important;
+  margin-bottom: 10px !important;
+}
+
+.quiz-card-content p {
+  font-size: 14px !important; /* Kích thước font mô tả */
+  color: #636e72 !important;
+  margin-bottom: 0 !important;
+}
+
+.quiz-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px !important;
+  border-top: 1px solid #e0e0e0 !important;
+}
+
+.quiz-card-actions button {
+  background: linear-gradient(90deg, #0984e3 0%, #74b9ff 100%) !important;
+  color: #fff !important;
+  font-size: 16px !important;
+  padding: 10px 30px !important;
+  border-radius: 20px !important;
+  transition: all 0.3s ease !important;
+}
+
+.quiz-card-actions button:hover {
+  background: linear-gradient(90deg, #0871c4 0%, #5a9de6 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 5px 15px rgba(9, 132, 227, 0.3) !important;
+}
+
+.quiz-card-actions .MuiIconButton-root {
+  font-size: 1.5rem !important; /* Kích thước icon nhỏ hơn để trông đơn giản */
+}
+
+/* Pagination */
+.quiz-pagination {
+  margin-top: 40px !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+/* Dialog */
+.quiz-dialog .MuiDialog-paper {
+  border-radius: 15px !important;
+  padding: 20px !important;
+}
+
+.quiz-dialog .MuiDialogTitle-root {
+  font-size: 24px !important;
+  font-weight: 600 !important;
+  color: #2d3436 !important;
+}
+
+.quiz-dialog .MuiTextField-root {
+  margin-bottom: 20px !important;
+}
+
+.quiz-dialog img {
+  border-radius: 10px !important;
+  margin-top: 10px !important;
+  width: 100% !important;
+  max-height: 300px !important;
+  object-fit: cover !important;
+}
+
+.quiz-dialog .MuiButton-root {
+  padding: 10px 20px !important;
+  font-size: 16px !important;
+  border-radius: 20px !important;
+}
+
+.quiz-dialog .MuiButton-containedPrimary {
+  background: linear-gradient(90deg, #00b894 0%, #55efc4 100%) !important;
+}
+
+.quiz-dialog .MuiButton-containedPrimary:hover {
+  background: linear-gradient(90deg, #00a676 0%, #4acda5 100%) !important;
+}

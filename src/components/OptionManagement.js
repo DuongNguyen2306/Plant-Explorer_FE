@@ -2,26 +2,14 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import {
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Grid,
-  Box,
-  Pagination,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControlLabel,
-  Checkbox,
-  IconButton,
-  CardMedia,
+  Card, CardContent, Typography, Button, Grid, Box, Pagination,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField,
+  FormControlLabel, Checkbox, IconButton, CardMedia,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import { Edit, Delete } from "@mui/icons-material";
+import { getUserRoleFromAPI } from "../utils/roleUtils";
 
 const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/options";
 
@@ -31,11 +19,16 @@ const OptionManagement = () => {
   const [page, setPage] = useState(1);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingOption, setEditingOption] = useState(null);
+  const [role, setRole] = useState(null);
   const rowsPerPage = 6;
 
   useEffect(() => {
-    fetchOptions();
-  }, [questionId]);
+    getUserRoleFromAPI().then(setRole);
+  }, []);
+
+  useEffect(() => {
+    if (role === "staff" || role === "children") fetchOptions();
+  }, [role, questionId]);
 
   const fetchOptions = async () => {
     try {
@@ -83,20 +76,25 @@ const OptionManagement = () => {
     }
   };
 
+  if (role === null) return <p>Loading...</p>;
+  if (role !== "staff" && role !== "children") return <p style={{ color: 'red' }}>You do not have permission to view options.</p>;
+
   return (
     <Box sx={{ padding: 4, backgroundColor: "#e3eafc", minHeight: "100vh" }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         Option Management
       </Typography>
 
-      <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
-        <Button variant="contained" color="success" onClick={() => handleOpenDialog()}>
-          ADD OPTION
-        </Button>
-        <Button onClick={fetchOptions} variant="contained" color="primary">
-          REFRESH
-        </Button>
-      </Box>
+      {role === "staff" && (
+        <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+          <Button variant="contained" color="success" onClick={() => handleOpenDialog()}>
+            ADD OPTION
+          </Button>
+          <Button onClick={fetchOptions} variant="contained" color="primary">
+            REFRESH
+          </Button>
+        </Box>
+      )}
 
       <Grid container spacing={3}>
         {paginatedOptions.map((option) => (
@@ -117,21 +115,22 @@ const OptionManagement = () => {
                 ) : (
                   <CancelIcon color="error" sx={{ fontSize: 40, mt: 1 }} />
                 )}
-                <Box sx={{ display: "flex", justifyContent: "center", mt: 2, gap: 1 }}>
-                  <IconButton color="info" onClick={() => handleOpenDialog(option)}>
-                    <Edit />
-                  </IconButton>
-                  <IconButton color="error" onClick={() => handleDelete(option.id)}>
-                    <Delete />
-                  </IconButton>
-                </Box>
+                {role === "staff" && (
+                  <Box sx={{ display: "flex", justifyContent: "center", mt: 2, gap: 1 }}>
+                    <IconButton color="info" onClick={() => handleOpenDialog(option)}>
+                      <Edit />
+                    </IconButton>
+                    <IconButton color="error" onClick={() => handleDelete(option.id)}>
+                      <Delete />
+                    </IconButton>
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Grid>
         ))}
       </Grid>
 
-      {/* Hiển thị phân trang nếu có dữ liệu */}
       {options.length > 0 && (
         <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
           <Pagination
@@ -143,41 +142,42 @@ const OptionManagement = () => {
         </Box>
       )}
 
-      {/* Dialog Thêm/Sửa */}
-      <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>{editingOption?.id ? "Edit Option" : "Add Option"}</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="Name"
-            fullWidth
-            margin="dense"
-            value={editingOption?.name || ""}
-            onChange={(e) => setEditingOption({ ...editingOption, name: e.target.value })}
-          />
-          <TextField
-            label="Context"
-            fullWidth
-            margin="dense"
-            value={editingOption?.context || ""}
-            onChange={(e) => setEditingOption({ ...editingOption, context: e.target.value })}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={editingOption?.isCorrect || false}
-                onChange={(e) =>
-                  setEditingOption({ ...editingOption, isCorrect: e.target.checked })
-                }
-              />
-            }
-            label="Is Correct?"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSave} color="primary">Save</Button>
-        </DialogActions>
-      </Dialog>
+      {role === "staff" && (
+        <Dialog open={openDialog} onClose={handleCloseDialog}>
+          <DialogTitle>{editingOption?.id ? "Edit Option" : "Add Option"}</DialogTitle>
+          <DialogContent>
+            <TextField
+              label="Name"
+              fullWidth
+              margin="dense"
+              value={editingOption?.name || ""}
+              onChange={(e) => setEditingOption({ ...editingOption, name: e.target.value })}
+            />
+            <TextField
+              label="Context"
+              fullWidth
+              margin="dense"
+              value={editingOption?.context || ""}
+              onChange={(e) => setEditingOption({ ...editingOption, context: e.target.value })}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={editingOption?.isCorrect || false}
+                  onChange={(e) =>
+                    setEditingOption({ ...editingOption, isCorrect: e.target.checked })
+                  }
+                />
+              }
+              label="Is Correct?"
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Cancel</Button>
+            <Button onClick={handleSave} color="primary">Save</Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 };
