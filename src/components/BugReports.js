@@ -7,8 +7,8 @@ import {
 } from "@mui/material";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 
-const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/bugreports";
-const CREATE_BUG_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/bugreports/report";
+const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/bug-reports";
+const CREATE_BUG_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/bug-reports";
 
 const BugReports = () => {
   const [bugs, setBugs] = useState([]);
@@ -19,9 +19,22 @@ const BugReports = () => {
   const [rowsPerPage] = useState(5);
   const [totalCount, setTotalCount] = useState(0);
   const [role, setRole] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    getUserRoleFromAPI().then(setRole);
+    const token = localStorage.getItem("token");
+    console.log("Token on component mount:", token);
+    getUserRoleFromAPI().then((fetchedRole) => {
+      console.log("Fetched role:", fetchedRole);
+      setRole(fetchedRole);
+      if (!fetchedRole) {
+        setError("Failed to determine user role. Please log in again.");
+      }
+    }).catch((err) => {
+      console.error("Error fetching role:", err);
+      console.log("Error response from getUserRoleFromAPI:", err.response);
+      setError("Failed to fetch role: " + (err.message || "Unknown error"));
+    });
   }, []);
 
   useEffect(() => {
@@ -29,37 +42,86 @@ const BugReports = () => {
   }, [search, page, role]);
 
   const fetchBugs = () => {
+    const token = localStorage.getItem("token");
+    console.log("Token used for fetchBugs:", token);
+    if (!token) {
+      setError("No token found. Please log in again.");
+      return;
+    }
+
     axios.get(API_URL, {
       params: {
         index: page + 1,
         pageSize: rowsPerPage,
         nameSearch: search
-      }
+      },
+      headers: { Authorization: `Bearer ${token}` },
     })
     .then((response) => {
+      console.log("fetchBugs response:", response.data);
       setBugs(response.data?.data?.items || []);
       setTotalCount(response.data?.data?.totalCount || 0);
+      setError(null);
     })
-    .catch((error) => console.error("Error fetching bug reports:", error));
+    .catch((error) => {
+      console.error("Error fetching bug reports:", error);
+      console.log("Error response from fetchBugs:", error.response);
+      setError("Failed to fetch bug reports: " + (error.response?.data?.Message || error.message));
+    });
   };
 
   const handleCreateBug = () => {
+    // Kiểm tra dữ liệu trước khi gửi
     if (!newBug.name || !newBug.context) {
-      alert("Please fill in all fields");
+      alert("Please fill in both Bug Title and Bug Description.");
       return;
     }
 
-    axios.post(CREATE_BUG_URL, newBug, {
-      headers: { "Content-Type": "application/json" },
+    const token = localStorage.getItem("token");
+    console.log("Token used for handleCreateBug:", token);
+    if (!token) {
+      setError("No token found. Please log in again.");
+      return;
+    }
+
+    // Đảm bảo dữ liệu gửi lên đúng định dạng
+    const bugData = {
+      name: newBug.name.trim(), // Loại bỏ khoảng trắng thừa
+      context: newBug.context.trim(),
+    };
+
+    axios.post(CREATE_BUG_URL, bugData, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
     })
-    .then(() => {
-      fetchBugs();
-      setOpen(false);
-      setNewBug({ name: "", context: "" });
+    .then((response) => {
+      console.log("handleCreateBug response:", response.data);
+      // Kiểm tra nếu response trả về mã 200 (OK)
+      if (response.status === 200) {
+        alert("Bug report created successfully!");
+        fetchBugs(); // Làm mới danh sách bug reports
+        setOpen(false); // Đóng dialog
+        setNewBug({ name: "", context: "" }); // Reset form
+        setError(null);
+      } else {
+        throw new Error("Unexpected response status: " + response.status);
+      }
     })
     .catch((error) => {
       console.error("Error creating bug report:", error);
-      alert("Failed to create bug report");
+      console.log("Error response from handleCreateBug:", error.response);
+      let errorMessage = "Failed to create bug report: ";
+      if (error.response) {
+        // Lỗi từ server (có response)
+        errorMessage += error.response.data?.Message || error.response.data?.message || "Unknown server error";
+      } else {
+        // Lỗi không có response (mạng, timeout, v.v.)
+        errorMessage += error.message || "Unknown error";
+      }
+      setError(errorMessage);
+      alert(errorMessage); // Hiển thị thông báo lỗi cho người dùng
     });
   };
 
@@ -67,7 +129,8 @@ const BugReports = () => {
     setPage(newPage);
   };
 
-  if (role === null) return <p>Loading...</p>;
+  if (role === null && !error) return <p>Loading...</p>;
+  if (error) return <p style={{ color: "red" }}>{error}</p>;
 
   return (
     <div className="bug-reports-page" style={{ padding: 20 }}>
@@ -130,6 +193,7 @@ const BugReports = () => {
             margin="dense"
             value={newBug.name}
             onChange={(e) => setNewBug({ ...newBug, name: e.target.value })}
+            required
           />
           <TextField
             label="Bug Description"
@@ -139,6 +203,7 @@ const BugReports = () => {
             rows={4}
             value={newBug.context}
             onChange={(e) => setNewBug({ ...newBug, context: e.target.value })}
+            required
           />
         </DialogContent>
         <DialogActions>

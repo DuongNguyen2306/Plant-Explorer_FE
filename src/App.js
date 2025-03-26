@@ -1,4 +1,3 @@
-// 📁 App.js
 import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
@@ -10,7 +9,7 @@ import UserManagement from "./components/UserManagement";
 import AvatarManagement from "./components/AvatarManagement";
 import BadgeManagement from "./components/BadgeManagement";
 import PlantManagement from "./components/PlantManagement";
-import PlantDetail from "./components/PlantDetail"; // Thêm import cho PlantDetail
+import PlantDetail from "./components/PlantDetail";
 import PlantCharacteristicManagement from "./components/PlantCharacteristicManagement";
 import CharacteristicCategoryManagement from "./components/CharacteristicCategoryManagement";
 import PlantApplicationManagement from "./components/PlantApplicationManagement";
@@ -57,6 +56,8 @@ const AppContent = ({ role, setRole }) => {
     const isStaffOnly = role === "staff";
     const isAdminOnly = role === "admin";
     const isChildren = role === "children";
+    // Thêm khai báo cho isAdminStaffOrChildren
+    const isAdminStaffOrChildren = ["admin", "staff", "children"].includes(role);
 
     const redirectIfUnauthorized = (allowedCondition, redirectTo = "/") => {
       if (!allowedCondition) {
@@ -92,7 +93,7 @@ const AppContent = ({ role, setRole }) => {
               element={redirectIfUnauthorized(isStaffOrChildren, "/users") || <PlantManagement />}
             />
             <Route
-              path="/plant/:plantId/detail" // Thêm route cho PlantDetail
+              path="/plant/:plantId/detail"
               element={redirectIfUnauthorized(isStaffOrChildren, "/plants") || <PlantDetail />}
             />
             <Route
@@ -105,7 +106,7 @@ const AppContent = ({ role, setRole }) => {
             />
             <Route
               path="/bug-reports"
-              element={redirectIfUnauthorized(isStaffOrChildren) || <BugReports />}
+              element={redirectIfUnauthorized(isAdminStaffOrChildren) || <BugReports />}
             />
             <Route
               path="/users/:userId/favorite-plants"

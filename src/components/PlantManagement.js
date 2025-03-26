@@ -1,5 +1,4 @@
-// 📁 components/PlantManagement.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
@@ -10,8 +9,10 @@ import { Edit, Delete } from "@mui/icons-material";
 import { BASE_API } from "../constant";
 import { useNavigate } from "react-router-dom";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
+import debounce from "lodash/debounce"; // Thêm lodash để dùng debounce
 
-const API_URL = BASE_API + "/plant";
+const API_URL = BASE_API + "/plants";
+const SEARCH_API_URL = BASE_API + "/search";
 
 const PlantManagement = () => {
   const [plants, setPlants] = useState([]);
@@ -24,26 +25,51 @@ const PlantManagement = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    getUserRoleFromAPI().then(setRole);
+    getUserRoleFromAPI().then(setRole).catch(error => {
+      console.error("Error fetching role:", error);
+      setRole(null);
+    });
   }, []);
 
-  useEffect(() => {
-    if (role === "staff" || role === "children") {
-      fetchPlants();
-    }
-  }, [role]);
-
-  const fetchPlants = async () => {
+  // Gọi API tìm kiếm hoặc lấy toàn bộ danh sách cây tùy thuộc vào giá trị search
+  const fetchPlants = useCallback(async (searchQuery = "") => {
     try {
-      const response = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      setPlants(response.data);
+      let response;
+      if (searchQuery) {
+        // Nếu có searchQuery, gọi API tìm kiếm
+        response = await axios.get(`${SEARCH_API_URL}/${encodeURIComponent(searchQuery)}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+      } else {
+        // Nếu không có searchQuery, lấy toàn bộ danh sách cây
+        response = await axios.get(API_URL, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+      }
+      console.log("API response:", response.data); // Debug response
+      setPlants(response.data || []);
     } catch (error) {
       console.error("Error fetching plants:", error.response?.data || error);
       alert("Failed to fetch plants: " + (error.response?.data?.message || error.message));
+      setPlants([]);
     }
-  };
+  }, []);
+
+  // Debounce fetchPlants để tránh gọi API liên tục
+  const debouncedFetchPlants = useCallback(
+    debounce((query) => {
+      fetchPlants(query);
+    }, 500),
+    [fetchPlants]
+  );
+
+  // Gọi fetchPlants khi role hoặc search thay đổi
+  useEffect(() => {
+    if (role === "staff" || role === "children") {
+      debouncedFetchPlants(search);
+      setPage(0); // Đặt lại trang về 0 khi search thay đổi
+    }
+  }, [role, search, debouncedFetchPlants]);
 
   const handleOpenDialog = (plant = null) => {
     setEditingPlant(plant || { name: "", scientificName: "", category: "", description: "" });
@@ -78,7 +104,7 @@ const PlantManagement = () => {
         await axios.post(API_URL, data, { headers });
         alert("Plant created successfully!");
       }
-      await fetchPlants();
+      await fetchPlants(search); // Làm mới danh sách với giá trị search hiện tại
       handleCloseDialog();
     } catch (error) {
       console.error("Error saving plant:", error);
@@ -92,7 +118,7 @@ const PlantManagement = () => {
         await axios.delete(`${API_URL}/${id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
-        await fetchPlants();
+        await fetchPlants(search); // Làm mới danh sách với giá trị search hiện tại
         alert("Plant deleted successfully!");
       } catch (error) {
         console.error("Error deleting plant:", error);
@@ -104,10 +130,6 @@ const PlantManagement = () => {
   const handleViewDetail = (plantId) => {
     navigate(`/plant/${plantId}/detail`);
   };
-
-  const filteredPlants = plants.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
 
   if (role === null) return <p>Loading...</p>;
   if (!['staff', 'children'].includes(role)) return <p style={{ color: 'red' }}>You do not have permission to view this page.</p>;
@@ -139,7 +161,7 @@ const PlantManagement = () => {
             <Button
               variant="contained"
               color="primary"
-              onClick={fetchPlants}
+              onClick={() => fetchPlants(search)} // Làm mới danh sách với giá trị search hiện tại
               sx={{ minWidth: "120px" }}
             >
               Refresh
@@ -159,7 +181,7 @@ const PlantManagement = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredPlants.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((plant) => (
+            {plants.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((plant) => (
               <TableRow key={plant.id}>
                 <TableCell>{plant.name}</TableCell>
                 <TableCell>{plant.scientificName}</TableCell>
@@ -196,7 +218,7 @@ const PlantManagement = () => {
         </Table>
         <TablePagination
           component="div"
-          count={filteredPlants.length}
+          count={plants.length}
           page={page}
           onPageChange={(e, newPage) => setPage(newPage)}
           rowsPerPage={rowsPerPage}

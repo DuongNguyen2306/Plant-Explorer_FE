@@ -1,4 +1,3 @@
-// 📁 components/Sidebar.js
 import React, { useEffect, useState } from "react";
 import {
   Drawer,
@@ -11,6 +10,7 @@ import {
   Typography,
   Divider,
   Box,
+  CircularProgress,
 } from "@mui/material";
 import {
   BugReport,
@@ -31,32 +31,74 @@ const Sidebar = () => {
   const [role, setRole] = useState(null);
   const [username, setUsername] = useState("User"); // Mặc định là "User"
   const [selectedAvatar, setSelectedAvatar] = useState(
-    localStorage.getItem("selectedAvatar") || "https://via.placeholder.com/40" // Avatar mặc định nếu chưa chọn
+    localStorage.getItem("selectedAvatar") || "https://via.placeholder.com/40" // Giá trị mặc định ban đầu
   );
+  const [loading, setLoading] = useState(true); // Thêm trạng thái loading
 
   useEffect(() => {
-    getUserRoleFromAPI().then(setRole);
+    getUserRoleFromAPI()
+      .then((fetchedRole) => {
+        setRole(fetchedRole);
+      })
+      .catch((error) => {
+        console.error("Error fetching role:", error);
+        setRole(null);
+        setLoading(false);
+      });
   }, []);
 
-  // Lấy thông tin người dùng (bao gồm tên tài khoản)
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(`${BASE_API}/user/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUsername(response.data.username || "User");
-      } catch (error) {
-        console.error("Error fetching user info:", error);
-        setUsername("User");
+  // Lấy thông tin người dùng (bao gồm tên tài khoản và avatar)
+  const fetchUserInfo = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No token found. Please log in again.");
       }
-    };
+      const response = await axios.get(`${BASE_API}/users/current-user`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log("User profile response:", response.data); // Debug
+      setUsername(response.data.data.username || "User");
+      // Kiểm tra xem API có trả về avatarUrl không
+      const avatarUrl = response.data.data.avatarUrl || response.data.data.avatar?.imageUrl;
+      if (avatarUrl) {
+        setSelectedAvatar(avatarUrl);
+        localStorage.setItem("selectedAvatar", avatarUrl); // Đồng bộ với localStorage
+      } else {
+        // Nếu API không trả về avatar, sử dụng giá trị từ localStorage hoặc mặc định
+        setSelectedAvatar(
+          localStorage.getItem("selectedAvatar") || "https://via.placeholder.com/40"
+        );
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+      setUsername("User");
+      setSelectedAvatar(
+        localStorage.getItem("selectedAvatar") || "https://via.placeholder.com/40"
+      );
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (role) {
       fetchUserInfo();
     }
   }, [role]);
+
+  // Lắng nghe sự kiện avatarUpdated để cập nhật avatar mà không cần làm mới trang
+  useEffect(() => {
+    const handleAvatarUpdated = () => {
+      fetchUserInfo();
+    };
+
+    window.addEventListener("avatarUpdated", handleAvatarUpdated);
+    return () => {
+      window.removeEventListener("avatarUpdated", handleAvatarUpdated);
+    };
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -91,10 +133,21 @@ const Sidebar = () => {
       sx={{ width: 250, "& .MuiDrawer-paper": { width: 250, boxSizing: "border-box" } }}
     >
       <Toolbar>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Avatar src={selectedAvatar} alt="User Avatar" />
-          <Typography variant="h6">{username}</Typography>
-        </Box>
+        {loading ? (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <CircularProgress size={40} />
+            <Typography variant="h6">Loading...</Typography>
+          </Box>
+        ) : (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Avatar
+              src={selectedAvatar}
+              alt="User Avatar"
+              onError={(e) => (e.target.src = "https://via.placeholder.com/40?text=Error")} // Xử lý lỗi hình ảnh
+            />
+            <Typography variant="h6">{username}</Typography>
+          </Box>
+        )}
       </Toolbar>
       <Divider />
       <List>
