@@ -1,4 +1,3 @@
-// 📁 components/QuizManagement.js
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -20,8 +19,9 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  Container,
 } from "@mui/material";
-import { Edit, Delete, Refresh } from "@mui/icons-material";
+import { Edit, Delete, Refresh, AddCircle } from "@mui/icons-material";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 import "../css/QuizManagement.css";
 
@@ -37,7 +37,7 @@ const QuizManagement = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const quizzesPerPage = 6;
+  const quizzesPerPage = 8; // Updated to 8 to fit 4 quizzes per row (2 rows per page)
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -57,7 +57,7 @@ const QuizManagement = () => {
 
     setLoading(true);
     try {
-      const index = page; // Theo API documentation, index bắt đầu từ 1
+      const index = page;
       const res = await axios.get(API_URL, {
         params: {
           index: index,
@@ -110,7 +110,6 @@ const QuizManagement = () => {
       return;
     }
 
-    // Kiểm tra imageUrl chỉ khi tạo mới (không có id)
     if (!editingQuiz.id && (!editingQuiz.imageUrl || editingQuiz.imageUrl.trim() === "")) {
       setSnackbar({ open: true, message: "Please provide a valid image URL for the new quiz!", severity: "warning" });
       return;
@@ -122,20 +121,17 @@ const QuizManagement = () => {
         "Content-Type": "application/json",
       };
 
-      // Chỉ gửi các trường name và imageUrl theo API documentation
       const data = {
         name: editingQuiz.name,
-        imageUrl: editingQuiz.imageUrl || "", // Nếu không có imageUrl, gửi chuỗi rỗng (sẽ bị backend từ chối nếu không hợp lệ)
+        imageUrl: editingQuiz.imageUrl || "",
       };
 
       setLoading(true);
       if (editingQuiz.id) {
-        // Cập nhật quiz (PUT)
         await axios.put(`${API_URL}/${editingQuiz.id}`, { ...data, description: editingQuiz.description || "" }, { headers });
         setSnackbar({ open: true, message: "Quiz updated successfully!", severity: "success" });
       } else {
-        // Thêm quiz mới (POST)
-        await axios.post(API_URL, data, { headers }); // Sửa URL từ /api/quizzes/quiz thành /api/quizzes
+        await axios.post(API_URL, data, { headers });
         setSnackbar({ open: true, message: "Quiz added successfully!", severity: "success" });
       }
       await fetchQuizzes();
@@ -193,14 +189,20 @@ const QuizManagement = () => {
   );
 
   return (
-    <Box className="quiz-management-container">
+    <Container maxWidth="lg" sx={{ py: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
       {/* Header Section */}
-      <Box className="quiz-management-header">
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <Typography variant="h4" fontWeight="bold" color="primary">
           Quiz Management
         </Typography>
-
-        <Box sx={{ display: "flex", gap: 2, marginBottom: 3 }}>
+        <Box sx={{ display: "flex", gap: 2 }}>
           <TextField
             label="Search Quiz"
             value={search}
@@ -209,16 +211,22 @@ const QuizManagement = () => {
               setPage(1);
             }}
             variant="outlined"
-            sx={{ flex: 1 }}
+            size="small"
+            sx={{ width: 300 }}
           />
           {role === "staff" && (
             <>
               <Button
                 variant="contained"
                 color="success"
+                startIcon={<AddCircle />}
                 onClick={() => handleOpenDialog()}
                 disabled={loading}
-                sx={{ minWidth: 120 }}
+                sx={{
+                  borderRadius: "20px",
+                  textTransform: "none",
+                  fontWeight: "bold",
+                }}
               >
                 Add Quiz
               </Button>
@@ -228,7 +236,11 @@ const QuizManagement = () => {
                 color="primary"
                 startIcon={<Refresh />}
                 disabled={loading}
-                sx={{ minWidth: 120 }}
+                sx={{
+                  borderRadius: "20px",
+                  textTransform: "none",
+                  fontWeight: "bold",
+                }}
               >
                 Refresh
               </Button>
@@ -245,13 +257,24 @@ const QuizManagement = () => {
       )}
 
       {/* Quiz Cards Section */}
-      <Box className="quiz-list-container">
-        <Grid container spacing={4}>
+      <Box>
+        <Grid container spacing={2}>
           {filteredQuizzes.map((quiz) => (
-            <Grid item xs={12} sm={6} md={6} key={quiz.id}>
-              <Card className="quiz-card">
+            <Grid item xs={12} sm={6} md={3} key={quiz.id}>
+              <Card
+                sx={{
+                  borderRadius: "15px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  transition: "transform 0.2s, box-shadow 0.2s",
+                  "&:hover": {
+                    transform: "scale(1.02)",
+                    boxShadow: "0 6px 16px rgba(0,0,0,0.15)",
+                  },
+                }}
+              >
                 <CardMedia
                   component="img"
+                  height="140"
                   image={
                     quiz.imageUrl && quiz.imageUrl !== "null"
                       ? quiz.imageUrl
@@ -259,37 +282,58 @@ const QuizManagement = () => {
                   }
                   alt={quiz.name}
                   onError={(e) => (e.target.src = "https://via.placeholder.com/300")}
+                  sx={{ objectFit: "cover" }}
                 />
-                <CardContent className="quiz-card-content">
-                  <Typography variant="h5" fontWeight="bold" gutterBottom>
+                <CardContent sx={{ padding: "12px" }}>
+                  <Typography variant="h6" fontWeight="bold" gutterBottom>
                     {quiz.name}
                   </Typography>
-                  <Typography variant="body1" color="text.secondary">
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     {quiz.description || "No description available"}
                   </Typography>
                 </CardContent>
-                <Box className="quiz-card-actions">
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "0 12px 12px",
+                  }}
+                >
                   <Button
                     variant="contained"
+                    color="primary"
                     onClick={() => navigate(`/quizzes/${quiz.id}/questions`)}
+                    sx={{
+                      borderRadius: "20px",
+                      textTransform: "none",
+                      fontWeight: "bold",
+                      fontSize: "0.8rem",
+                    }}
                   >
                     View
                   </Button>
                   {role === "staff" && (
-                    <Box>
+                    <Box sx={{ display: "flex", gap: 1 }}>
                       <IconButton
-                        className="edit-icon"
                         onClick={() => handleOpenDialog(quiz)}
                         disabled={loading}
+                        sx={{
+                          color: "#1976d2",
+                          "&:hover": { backgroundColor: "rgba(25, 118, 210, 0.1)" },
+                        }}
                       >
-                        <Edit />
+                        <Edit fontSize="small" />
                       </IconButton>
                       <IconButton
-                        className="delete-icon"
                         onClick={() => handleDeleteQuiz(quiz.id)}
                         disabled={loading}
+                        sx={{
+                          color: "#d32f2f",
+                          "&:hover": { backgroundColor: "rgba(211, 47, 47, 0.1)" },
+                        }}
                       >
-                        <Delete />
+                        <Delete fontSize="small" />
                       </IconButton>
                     </Box>
                   )}
@@ -306,22 +350,29 @@ const QuizManagement = () => {
         )}
 
         {totalPages > 1 && (
-          <Box className="quiz-pagination">
+          <Box sx={{ display: "flex", justifyContent: "center", mt: 4, mb: 2 }}>
             <Pagination
               count={totalPages}
               page={page}
               onChange={(e, value) => setPage(value)}
               color="primary"
               size="large"
+              sx={{
+                "& .MuiPaginationItem-root": {
+                  fontSize: "1.1rem",
+                },
+              }}
             />
           </Box>
         )}
       </Box>
 
       {role === "staff" && (
-        <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth className="quiz-dialog">
-          <DialogTitle>{editingQuiz?.id ? "Edit Quiz" : "Add Quiz"}</DialogTitle>
-          <DialogContent>
+        <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ bgcolor: "primary.main", color: "white" }}>
+            {editingQuiz?.id ? "Edit Quiz" : "Add Quiz"}
+          </DialogTitle>
+          <DialogContent sx={{ padding: "20px" }}>
             <TextField
               label="Quiz Name"
               fullWidth
@@ -331,6 +382,7 @@ const QuizManagement = () => {
               required
               error={!editingQuiz?.name}
               helperText={!editingQuiz?.name ? "Quiz name is required" : ""}
+              variant="outlined"
             />
             <TextField
               label="Image URL"
@@ -338,9 +390,14 @@ const QuizManagement = () => {
               margin="dense"
               value={editingQuiz?.imageUrl || ""}
               onChange={(e) => setEditingQuiz({ ...editingQuiz, imageUrl: e.target.value })}
-              required={!editingQuiz?.id} // Chỉ bắt buộc khi tạo mới
+              required={!editingQuiz?.id}
               error={!editingQuiz?.id && (!editingQuiz?.imageUrl || editingQuiz?.imageUrl.trim() === "")}
-              helperText={!editingQuiz?.id && (!editingQuiz?.imageUrl || editingQuiz?.imageUrl.trim() === "") ? "Image URL is required for new quizzes" : ""}
+              helperText={
+                !editingQuiz?.id && (!editingQuiz?.imageUrl || editingQuiz?.imageUrl.trim() === "")
+                  ? "Image URL is required for new quizzes"
+                  : ""
+              }
+              variant="outlined"
             />
             {editingQuiz?.imageUrl && (
               <Box sx={{ mt: 2 }}>
@@ -355,7 +412,7 @@ const QuizManagement = () => {
                   }
                   alt="Quiz preview"
                   onError={(e) => (e.target.src = "https://via.placeholder.com/300")}
-                  style={{ maxWidth: "100%", height: "auto" }}
+                  style={{ maxWidth: "100%", height: "auto", borderRadius: "8px" }}
                 />
               </Box>
             )}
@@ -367,11 +424,24 @@ const QuizManagement = () => {
               rows={3}
               value={editingQuiz?.description || ""}
               onChange={(e) => setEditingQuiz({ ...editingQuiz, description: e.target.value })}
+              variant="outlined"
             />
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog} disabled={loading}>Cancel</Button>
-            <Button onClick={handleSaveQuiz} color="primary" disabled={loading}>
+          <DialogActions sx={{ padding: "16px", bgcolor: "#f5f7fa", borderTop: "1px solid #e0e0e0" }}>
+            <Button
+              onClick={handleCloseDialog}
+              disabled={loading}
+              sx={{ textTransform: "none", fontWeight: "bold" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveQuiz}
+              color="primary"
+              variant="contained"
+              disabled={loading}
+              sx={{ borderRadius: "20px", textTransform: "none", fontWeight: "bold" }}
+            >
               {loading ? <CircularProgress size={24} /> : "Save"}
             </Button>
           </DialogActions>
@@ -387,7 +457,7 @@ const QuizManagement = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </Container>
   );
 };
 

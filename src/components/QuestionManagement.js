@@ -23,7 +23,7 @@ const QuestionManagement = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const pageSize = 10;
+  const pageSize = 9; // Updated to 9 to fit 3 questions per row (3 rows per page)
 
   useEffect(() => {
     getUserRoleFromAPI().then(setRole);
@@ -49,7 +49,7 @@ const QuestionManagement = () => {
 
     setLoading(true);
     try {
-      const index = page; // Theo API documentation, index bắt đầu từ 1
+      const index = page;
       const headers = { Authorization: `Bearer ${token}` };
 
       const res = await axios.get(API_URL, {
@@ -188,8 +188,16 @@ const QuestionManagement = () => {
   );
 
   return (
-    <Container maxWidth="lg" sx={{ py: 5, backgroundColor: "#f0f4f8", minHeight: "100vh" }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
+    <Container maxWidth="lg" sx={{ py: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
+      {/* Header Section */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
         <Typography variant="h4" fontWeight="bold" color="primary">
           Question Management
         </Typography>
@@ -201,6 +209,11 @@ const QuestionManagement = () => {
               startIcon={<AddCircle />}
               onClick={() => handleOpenDialog()}
               disabled={loading}
+              sx={{
+                borderRadius: "20px",
+                textTransform: "none",
+                fontWeight: "bold",
+              }}
             >
               Add Question
             </Button>
@@ -210,6 +223,11 @@ const QuestionManagement = () => {
               startIcon={<Refresh />}
               onClick={fetchQuestions}
               disabled={loading}
+              sx={{
+                borderRadius: "20px",
+                textTransform: "none",
+                fontWeight: "bold",
+              }}
             >
               Refresh
             </Button>
@@ -217,19 +235,31 @@ const QuestionManagement = () => {
         )}
       </Box>
 
+      {/* Loading Indicator */}
       {loading && (
         <Box sx={{ display: "flex", justifyContent: "center", my: 3 }}>
           <CircularProgress />
         </Box>
       )}
 
-      <Grid container spacing={3}>
+      {/* Questions Grid */}
+      <Grid container spacing={2}>
         {questions.map((question) => (
-          <Grid item xs={12} sm={6} md={4} key={question.id}>
-            <Card sx={{ borderRadius: 3, boxShadow: 3, transition: "transform 0.2s", "&:hover": { transform: "scale(1.02)" } }}>
+          <Grid item xs={12} sm={6} md={4} key={question.id}> {/* Changed md={3} to md={4} to fit 3 questions per row */}
+            <Card
+              sx={{
+                borderRadius: "15px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                transition: "transform 0.2s, box-shadow 0.2s",
+                "&:hover": {
+                  transform: "scale(1.02)",
+                  boxShadow: "0 6px 16px rgba(0,0,0,0.15)",
+                },
+              }}
+            >
               <CardMedia
                 component="img"
-                height="160"
+                height="160" // Increased height to 160
                 image={
                   question.imageUrl && question.imageUrl !== "null"
                     ? question.imageUrl
@@ -238,10 +268,18 @@ const QuestionManagement = () => {
                 alt={question.name}
                 sx={{ objectFit: "cover" }}
               />
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" noWrap>{question.name}</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1, minHeight: "40px" }}>
-                  {question.context.length > 100 ? `${question.context.substring(0, 100)}...` : question.context}
+              <CardContent sx={{ padding: "16px" }}> {/* Increased padding to 16px */}
+                <Typography variant="h6" fontWeight="bold">
+                  {question.name}
+                </Typography>
+                <Typography
+                  variant="body1" // Changed to body1 for larger text
+                  color="text.secondary"
+                  sx={{ mb: 1 }}
+                >
+                  {question.context.length > 100
+                    ? `${question.context.substring(0, 100)}...`
+                    : question.context}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Points: {question.point}
@@ -253,16 +291,36 @@ const QuestionManagement = () => {
                   color="primary"
                   size="small"
                   onClick={() => navigate(`/quizzes/${quizId}/questions/${question.id}/options`)}
+                  sx={{
+                    borderRadius: "20px",
+                    textTransform: "none",
+                    fontWeight: "bold",
+                    fontSize: "0.875rem", // Increased font size
+                  }}
                 >
                   Options
                 </Button>
                 {role === "staff" && (
-                  <Box>
-                    <IconButton color="info" onClick={() => handleOpenDialog(question)} disabled={loading}>
-                      <Edit />
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <IconButton
+                      color="info"
+                      onClick={() => handleOpenDialog(question)}
+                      disabled={loading}
+                      sx={{
+                        "&:hover": { backgroundColor: "rgba(25, 118, 210, 0.1)" },
+                      }}
+                    >
+                      <Edit fontSize="small" />
                     </IconButton>
-                    <IconButton color="error" onClick={() => handleDelete(question.id)} disabled={loading}>
-                      <Delete />
+                    <IconButton
+                      color="error"
+                      onClick={() => handleDelete(question.id)}
+                      disabled={loading}
+                      sx={{
+                        "&:hover": { backgroundColor: "rgba(211, 47, 47, 0.1)" },
+                      }}
+                    >
+                      <Delete fontSize="small" />
                     </IconButton>
                   </Box>
                 )}
@@ -272,23 +330,32 @@ const QuestionManagement = () => {
         ))}
       </Grid>
 
+      {/* No Questions Message */}
       {questions.length === 0 && !loading && (
         <Typography variant="h6" color="text.secondary" textAlign="center" mt={5}>
           No questions found. {role === "staff" ? "Add a new question to get started!" : ""}
         </Typography>
       )}
 
+      {/* Pagination */}
       {totalPages > 1 && (
-        <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 4, mb: 2 }}>
           <Pagination
             count={totalPages}
             page={page}
             onChange={(e, value) => setPage(value)}
             color="primary"
+            size="large"
+            sx={{
+              "& .MuiPaginationItem-root": {
+                fontSize: "1.1rem",
+              },
+            }}
           />
         </Box>
       )}
 
+      {/* Dialog for Adding/Editing Questions */}
       {role === "staff" && (
         <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ bgcolor: "primary.main", color: "white" }}>
@@ -304,6 +371,7 @@ const QuestionManagement = () => {
               required
               error={!editingQuestion?.name}
               helperText={!editingQuestion?.name ? "Question name is required" : ""}
+              variant="outlined"
             />
             <TextField
               fullWidth
@@ -316,6 +384,7 @@ const QuestionManagement = () => {
               required
               error={!editingQuestion?.context}
               helperText={!editingQuestion?.context ? "Context is required" : ""}
+              variant="outlined"
             />
             <TextField
               fullWidth
@@ -323,6 +392,7 @@ const QuestionManagement = () => {
               margin="dense"
               value={editingQuestion?.imageUrl || ""}
               onChange={(e) => setEditingQuestion({ ...editingQuestion, imageUrl: e.target.value })}
+              variant="outlined"
             />
             <TextField
               fullWidth
@@ -332,17 +402,31 @@ const QuestionManagement = () => {
               value={editingQuestion?.point || 0}
               onChange={(e) => setEditingQuestion({ ...editingQuestion, point: parseInt(e.target.value) || 0 })}
               inputProps={{ min: 0 }}
+              variant="outlined"
             />
           </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={handleCloseDialog} disabled={loading}>Cancel</Button>
-            <Button onClick={handleSave} color="primary" variant="contained" disabled={loading}>
+          <DialogActions sx={{ p: 2, bgcolor: "#f5f7fa", borderTop: "1px solid #e0e0e0" }}>
+            <Button
+              onClick={handleCloseDialog}
+              disabled={loading}
+              sx={{ textTransform: "none", fontWeight: "bold" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              color="primary"
+              variant="contained"
+              disabled={loading}
+              sx={{ borderRadius: "20px", textTransform: "none", fontWeight: "bold" }}
+            >
               {loading ? <CircularProgress size={24} /> : "Save"}
             </Button>
           </DialogActions>
         </Dialog>
       )}
 
+      {/* Snackbar for Notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}

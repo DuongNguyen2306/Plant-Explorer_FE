@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import Navbar from "./components/Navbar";
+import Navbar from "./components/Navbar"; // Assuming this is Sidebar.js
 import Login from "./components/Login";
 import QuizManagement from "./components/QuizManagement";
 import QuestionManagement from "./components/QuestionManagement";
@@ -16,6 +16,7 @@ import PlantApplicationManagement from "./components/PlantApplicationManagement"
 import ApplicationCategoryManagement from "./components/ApplicationCategoryManagement";
 import BugReports from "./components/BugReports";
 import FavoritePlant from "./components/FavoritePlant";
+import QuizAttempts from "./components/QuizAttempts"; // Added import
 import { getUserRoleFromAPI } from "./utils/roleUtils";
 
 const AppContent = ({ role, setRole }) => {
@@ -25,7 +26,6 @@ const AppContent = ({ role, setRole }) => {
     console.log("AppContent useEffect triggered. Current location:", location.pathname);
     console.log("Current role state:", role);
 
-    // Bỏ qua nếu đang ở trang login
     if (location.pathname === "/") {
       console.log("On login page, skipping role fetch");
       return;
@@ -38,7 +38,6 @@ const AppContent = ({ role, setRole }) => {
       return;
     }
 
-    // Chỉ gọi API nếu role chưa được thiết lập
     if (role === null) {
       console.log("Fetching user role...");
       getUserRoleFromAPI()
@@ -61,14 +60,12 @@ const AppContent = ({ role, setRole }) => {
   const ProtectedRoutes = () => {
     console.log("Rendering ProtectedRoutes with role:", role);
 
-    // Định nghĩa các điều kiện phân quyền
     const isStaffOrChildren = ["staff", "children"].includes(role);
     const isStaffOnly = role === "staff";
     const isAdminOnly = role === "admin";
     const isChildren = role === "children";
     const isAdminStaffOrChildren = ["admin", "staff", "children"].includes(role);
 
-    // Ánh xạ route với điều kiện phân quyền và redirectTo
     const routePermissions = {
       "/quizzes": { condition: isStaffOrChildren, redirectTo: "/" },
       "/quizzes/:quizId/questions": { condition: isStaffOrChildren, redirectTo: "/" },
@@ -84,6 +81,8 @@ const AppContent = ({ role, setRole }) => {
       "/characteristic-categories": { condition: isStaffOnly, redirectTo: "/plants" },
       "/application-categories": { condition: isStaffOnly, redirectTo: "/plants" },
       "/users": { condition: isAdminOnly, redirectTo: "/" },
+      "/quiz-attempts": { condition: isStaffOnly, redirectTo: "/plants" }, // Added Quiz Attempts
+      "/quiz-attempt/:attemptId/detail": { condition: isStaffOnly, redirectTo: "/quiz-attempts" }, // Added Detail
     };
 
     const checkPermission = (path) => {
@@ -91,7 +90,7 @@ const AppContent = ({ role, setRole }) => {
         const regex = new RegExp(`^${key.replace(/:\w+/g, "[^/]+")}$`);
         return regex.test(path);
       });
-      if (!routeConfig) return { condition: true }; // Nếu không có config, cho phép truy cập
+      if (!routeConfig) return { condition: true };
       const { condition, redirectTo } = routePermissions[routeConfig];
       return { condition, redirectTo };
     };
@@ -238,6 +237,26 @@ const AppContent = ({ role, setRole }) => {
                   <UserManagement />
                 ) : (
                   <Navigate to={checkPermission("/users").redirectTo} />
+                )
+              }
+            />
+            <Route
+              path="/quiz-attempts"
+              element={
+                checkPermission("/quiz-attempts").condition ? (
+                  <QuizAttempts />
+                ) : (
+                  <Navigate to={checkPermission("/quiz-attempts").redirectTo} />
+                )
+              }
+            />
+            <Route
+              path="/quiz-attempt/:attemptId/detail"
+              element={
+                checkPermission("/quiz-attempt/:attemptId/detail").condition ? (
+                  <div>Quiz Attempt Detail Placeholder</div> // Replace with QuizAttemptDetail later
+                ) : (
+                  <Navigate to={checkPermission("/quiz-attempt/:attemptId/detail").redirectTo} />
                 )
               }
             />

@@ -8,18 +8,12 @@ import {
   Divider,
   Button,
   CircularProgress,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  MenuItem,
   Select,
   InputLabel,
   FormControl,
+  Chip,
+  MenuItem,
 } from "@mui/material";
-import { Edit, Delete, Add } from "@mui/icons-material";
 import { BASE_API } from "../constant";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 
@@ -29,13 +23,10 @@ const PlantDetail = () => {
   const [applications, setApplications] = useState([]);
   const [category, setCategory] = useState(null);
   const [characteristicCategories, setCharacteristicCategories] = useState([]);
+  const [applicationCategories, setApplicationCategories] = useState([]);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [openCharDialog, setOpenCharDialog] = useState(false);
-  const [openAppDialog, setOpenAppDialog] = useState(false);
-  const [editingChar, setEditingChar] = useState(null);
-  const [editingApp, setEditingApp] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -61,12 +52,15 @@ const PlantDetail = () => {
     try {
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const charCatRes = await axios.get(`${BASE_API}/characteristic-category`, { headers });
-      console.log("Characteristic Categories Response:", charCatRes.data);
+      const [charCatRes, appCatRes] = await Promise.all([
+        axios.get(`${BASE_API}/characteristic-category`, { headers }),
+        axios.get(`${BASE_API}/application-category`, { headers }),
+      ]);
       setCharacteristicCategories(charCatRes.data || []);
+      setApplicationCategories(appCatRes.data || []);
     } catch (error) {
-      console.error("Error fetching characteristic categories:", error);
-      alert("Failed to fetch characteristic categories: " + (error.response?.data?.message || error.message));
+      console.error("Error fetching categories:", error);
+      alert("Failed to fetch categories: " + (error.response?.data?.message || error.message));
     }
   };
 
@@ -86,16 +80,14 @@ const PlantDetail = () => {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
-      console.log("Characteristics response:", charRes.data);
-      console.log("Applications response:", appRes.data);
-      console.log("Category response:", catRes.data);
 
       const characteristicsData = charRes.data?.data?.items || charRes.data || [];
       const applicationsData = appRes.data?.data?.items || appRes.data || [];
+      const plantData = catRes.data || null;
 
       setCharacteristics(characteristicsData);
       setApplications(applicationsData);
-      setCategory(catRes.data || null);
+      setCategory(plantData);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching detail:", error);
@@ -104,127 +96,85 @@ const PlantDetail = () => {
     }
   };
 
-  const handleOpenCharDialog = (char = null) => {
-    setEditingChar(
-      char || { characteristicName: "", value: "", plantId, characteristicCategoryId: "" }
-    );
-    setOpenCharDialog(true);
-  };
-
-  const handleCloseCharDialog = () => {
-    setOpenCharDialog(false);
-    setEditingChar(null);
-  };
-
-  const handleOpenAppDialog = (app = null) => {
-    setEditingApp(
-      app || { applicationName: "", description: "", plantId, applicationCategoryId: "" }
-    );
-    setOpenAppDialog(true);
-  };
-
-  const handleCloseAppDialog = () => {
-    setOpenAppDialog(false);
-    setEditingApp(null);
-  };
-
-  const handleSaveChar = async () => {
-    if (!editingChar.characteristicCategoryId) {
-      alert("Please select a characteristic category.");
-      return;
-    }
+  const handleAddCharCategories = async (newCategories) => {
     try {
+      const token = localStorage.getItem("token");
       const headers = {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       };
-      const data = {
-        characteristicName: editingChar.characteristicName,
-        value: editingChar.value,
-        plantId: editingChar.plantId,
-        characteristicCategoryId: editingChar.characteristicCategoryId,
-        description: editingChar.value,
-      };
-      console.log("Data to be sent in POST request:", data); // Debug dữ liệu gửi lên API
 
-      let response;
-      if (editingChar.id) {
-        response = await axios.put(`${BASE_API}/plant-characteristics/${editingChar.id}`, data, { headers });
-        alert("Characteristic updated successfully!");
-      } else {
-        response = await axios.post(`${BASE_API}/plant-characteristics`, data, { headers });
-        console.log("POST response:", response.data);
-        alert("Characteristic created successfully!");
+      // Create a new characteristic for each selected category
+      for (const categoryId of newCategories) {
+        // Check if a characteristic with this category already exists
+        const existingChar = characteristics.find(
+          (char) => char.characteristicCategoryId === categoryId
+        );
+        if (!existingChar) {
+          const categoryName = characteristicCategories.find((cat) => cat.id === categoryId)?.name || "Unknown";
+          const data = {
+            plantId,
+            characteristicCategoryId: categoryId,
+            characteristicName: `${categoryName} Characteristic`, // Use category name for better context
+            value: "Default Value",
+          };
+          await axios.post(`${BASE_API}/plant-characteristics`, data, { headers });
+        }
       }
 
-      setTimeout(async () => {
-        await fetchAllData();
-        handleCloseCharDialog();
-      }, 500);
-    } catch (error) {
-      console.error("Error saving characteristic:", error);
-      alert("Failed to save characteristic: " + (error.response?.data?.message || error.message));
-    }
-  };
-
-  const handleDeleteChar = async (id) => {
-    if (window.confirm("Are you sure you want to delete this characteristic?")) {
-      try {
-        await axios.delete(`${BASE_API}/plant-characteristics/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        alert("Characteristic deleted successfully!");
-        await fetchAllData();
-      } catch (error) {
-        console.error("Error deleting characteristic:", error);
-        alert("Failed to delete characteristic: " + (error.response?.data?.message || error.message));
+      // Remove characteristics that are no longer selected
+      for (const char of characteristics) {
+        if (!newCategories.includes(char.characteristicCategoryId)) {
+          await axios.delete(`${BASE_API}/plant-characteristics/${char.id}`, { headers });
+        }
       }
-    }
-  };
 
-  const handleSaveApp = async () => {
-    if (!editingApp.applicationCategoryId) {
-      alert("Please enter an application category ID.");
-      return;
-    }
-    try {
-      const headers = {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json",
-      };
-      const data = {
-        applicationName: editingApp.applicationName,
-        description: editingApp.description,
-        plantId: editingApp.plantId,
-        applicationCategoryId: editingApp.applicationCategoryId,
-      };
-      if (editingApp.id) {
-        await axios.put(`${BASE_API}/plant-applications/${editingApp.id}`, data, { headers });
-        alert("Application updated successfully!");
-      } else {
-        await axios.post(`${BASE_API}/plant-applications`, data, { headers });
-        alert("Application created successfully!");
-      }
+      alert("Characteristic categories updated successfully!");
       await fetchAllData();
-      handleCloseAppDialog();
     } catch (error) {
-      console.error("Error saving application:", error);
-      alert("Failed to save application: " + (error.response?.data?.message || error.message));
+      console.error("Error adding characteristic categories:", error);
+      alert("Failed to add characteristic categories: " + (error.response?.data?.message || error.message));
     }
   };
 
-  const handleDeleteApp = async (id) => {
-    if (window.confirm("Are you sure you want to delete this application?")) {
-      try {
-        await axios.delete(`${BASE_API}/plant-applications/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        alert("Application deleted successfully!");
-        await fetchAllData();
-      } catch (error) {
-        console.error("Error deleting application:", error);
-        alert("Failed to delete application: " + (error.response?.data?.message || error.message));
+  const handleAddAppCategories = async (newCategories) => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
+      // Create a new application for each selected category
+      for (const categoryId of newCategories) {
+        // Check if an application with this category already exists
+        const existingApp = applications.find(
+          (app) => app.applicationCategoryId === categoryId
+        );
+        if (!existingApp) {
+          const categoryName = applicationCategories.find((cat) => cat.id === categoryId)?.name || "Unknown";
+          const data = {
+            plantId,
+            applicationCategoryId: categoryId,
+            applicationName: `${categoryName} Application`, // Use category name for better context
+            description: "Default Description",
+          };
+          await axios.post(`${BASE_API}/plant-applications`, data, { headers });
+        }
       }
+
+      // Remove applications that are no longer selected
+      for (const app of applications) {
+        if (!newCategories.includes(app.applicationCategoryId)) {
+          await axios.delete(`${BASE_API}/plant-applications/${app.id}`, { headers });
+        }
+      }
+
+      alert("Application categories updated successfully!");
+      await fetchAllData();
+    } catch (error) {
+      console.error("Error adding application categories:", error);
+      alert("Failed to add application categories: " + (error.response?.data?.message || error.message));
     }
   };
 
@@ -251,6 +201,10 @@ const PlantDetail = () => {
         </Button>
       </Box>
     );
+
+  // Get the currently selected category IDs from the characteristics and applications
+  const currentCharCategoryIds = characteristics.map((char) => char.characteristicCategoryId);
+  const currentAppCategoryIds = applications.map((app) => app.applicationCategoryId);
 
   return (
     <Box sx={{ padding: "20px" }}>
@@ -280,9 +234,6 @@ const PlantDetail = () => {
             <Typography variant="body1" sx={{ marginBottom: "5px" }}>
               <strong>Scientific Name:</strong> {category.scientificName || "N/A"}
             </Typography>
-            <Typography variant="body1" sx={{ marginBottom: "5px" }}>
-              <strong>Category:</strong> {category.category || "N/A"}
-            </Typography>
             <Typography variant="body1">
               <strong>Description:</strong> {category.description || "No description available"}
             </Typography>
@@ -298,41 +249,47 @@ const PlantDetail = () => {
           <Typography variant="h6" sx={{ fontWeight: "bold", color: "#2d3436" }}>
             Characteristics
           </Typography>
-          {role === "staff" && (
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<Add />}
-              onClick={() => handleOpenCharDialog()}
-              sx={{ marginBottom: "10px" }}
-            >
-              Add Characteristic
-            </Button>
-          )}
+          <Box>
+            <FormControl sx={{ minWidth: 200, marginRight: "10px" }}>
+              <InputLabel>Select Categories</InputLabel>
+              <Select
+                multiple
+                value={currentCharCategoryIds}
+                onChange={(e) => {
+                  const newCategories = e.target.value;
+                  handleAddCharCategories(newCategories);
+                }}
+                label="Select Categories"
+                renderValue={(selected) => (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                    {selected.map((value) => (
+                      <Chip
+                        key={value}
+                        label={characteristicCategories.find((cat) => cat.id === value)?.name}
+                      />
+                    ))}
+                  </Box>
+                )}
+              >
+                {characteristicCategories.map((category) => (
+                  <MenuItem key={category.id} value={category.id}>
+                    {category.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
         </Box>
         <Divider sx={{ marginY: "10px" }} />
         {characteristics.length > 0 ? (
           characteristics.map((char) => (
-            <Box key={char.id} sx={{ marginBottom: "10px", display: "flex", alignItems: "center" }}>
-              <Typography variant="body1" sx={{ flexGrow: 1 }}>
-                <strong>{char.characteristicName || "N/A"}:</strong> {char.value || "N/A"}
+            <Box key={char.id} sx={{ marginBottom: "10px" }}>
+              <Typography variant="body1">
+                <strong>
+                  {characteristicCategories.find((cat) => cat.id === char.characteristicCategoryId)?.name || "Unknown Category"}:
+                </strong>{" "}
+                {char.characteristicName} - {char.value}
               </Typography>
-              {role === "staff" && (
-                <>
-                  <IconButton
-                    onClick={() => handleOpenCharDialog(char)}
-                    sx={{ color: "#1976d2", marginLeft: "10px" }}
-                  >
-                    <Edit fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => handleDeleteChar(char.id)}
-                    sx={{ color: "#d32f2f", marginLeft: "5px" }}
-                  >
-                    <Delete fontSize="small" />
-                  </IconButton>
-                </>
-              )}
             </Box>
           ))
         ) : (
@@ -346,130 +303,53 @@ const PlantDetail = () => {
           <Typography variant="h6" sx={{ fontWeight: "bold", color: "#2d3436" }}>
             Applications
           </Typography>
-          {role === "staff" && (
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<Add />}
-              onClick={() => handleOpenAppDialog()}
-              sx={{ marginBottom: "10px" }}
-            >
-              Add Application
-            </Button>
-          )}
-        </Box>
-        <Divider sx={{ marginY: "10px" }} />
-        {applications.length > 0 ? (
-          applications.map((app) => (
-            <Box key={app.id} sx={{ marginBottom: "10px", display: "flex", alignItems: "center" }}>
-              <Typography variant="body1" sx={{ flexGrow: "1" }}>
-                <strong>{app.applicationName || "N/A"}:</strong> {app.description || "N/A"}
-              </Typography>
-              {role === "staff" && (
-                <>
-                  <IconButton
-                    onClick={() => handleOpenAppDialog(app)}
-                    sx={{ color: "#1976d2", marginLeft: "10px" }}
-                  >
-                    <Edit fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => handleDeleteApp(app.id)}
-                    sx={{ color: "#d32f2f", marginLeft: "5px" }}
-                  >
-                    <Delete fontSize="small" />
-                  </IconButton>
-                </>
-              )}
-            </Box>
-          ))
-        ) : (
-          <Typography color="text.secondary">No applications found.</Typography>
-        )}
-      </Paper>
-
-      {/* Dialog for Add/Edit Characteristic */}
-      {role === "staff" && (
-        <Dialog open={openCharDialog} onClose={handleCloseCharDialog} maxWidth="sm" fullWidth>
-          <DialogTitle>{editingChar?.id ? "Edit Characteristic" : "Add Characteristic"}</DialogTitle>
-          <DialogContent>
-            <TextField
-              label="Characteristic Name"
-              fullWidth
-              margin="dense"
-              value={editingChar?.characteristicName || ""}
-              onChange={(e) => setEditingChar({ ...editingChar, characteristicName: e.target.value })}
-            />
-            <TextField
-              label="Value"
-              fullWidth
-              margin="dense"
-              value={editingChar?.value || ""}
-              onChange={(e) => setEditingChar({ ...editingChar, value: e.target.value })}
-            />
-            <FormControl fullWidth margin="dense">
-              <InputLabel>Characteristic Category</InputLabel>
+          <Box>
+            <FormControl sx={{ minWidth: 200, marginRight: "10px" }}>
+              <InputLabel>Select Categories</InputLabel>
               <Select
-                value={editingChar?.characteristicCategoryId || ""}
-                onChange={(e) =>
-                  setEditingChar({ ...editingChar, characteristicCategoryId: e.target.value })
-                }
-                label="Characteristic Category"
+                multiple
+                value={currentAppCategoryIds}
+                onChange={(e) => {
+                  const newCategories = e.target.value;
+                  handleAddAppCategories(newCategories);
+                }}
+                label="Select Categories"
+                renderValue={(selected) => (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                    {selected.map((value) => (
+                      <Chip
+                        key={value}
+                        label={applicationCategories.find((cat) => cat.id === value)?.name}
+                      />
+                    ))}
+                  </Box>
+                )}
               >
-                <MenuItem value="">
-                  <em>Select a category</em>
-                </MenuItem>
-                {characteristicCategories.map((category) => (
+                {applicationCategories.map((category) => (
                   <MenuItem key={category.id} value={category.id}>
                     {category.name}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseCharDialog}>Cancel</Button>
-            <Button onClick={handleSaveChar} color="primary">Save</Button>
-          </DialogActions>
-        </Dialog>
-      )}
-
-      {/* Dialog for Add/Edit Application */}
-      {role === "staff" && (
-        <Dialog open={openAppDialog} onClose={handleCloseAppDialog} maxWidth="sm" fullWidth>
-          <DialogTitle>{editingApp?.id ? "Edit Application" : "Add Application"}</DialogTitle>
-          <DialogContent>
-            <TextField
-              label="Application Name"
-              fullWidth
-              margin="dense"
-              value={editingApp?.applicationName || ""}
-              onChange={(e) => setEditingApp({ ...editingApp, applicationName: e.target.value })}
-            />
-            <TextField
-              label="Description"
-              fullWidth
-              margin="dense"
-              multiline
-              rows={3}
-              value={editingApp?.description || ""}
-              onChange={(e) => setEditingApp({ ...editingApp, description: e.target.value })}
-            />
-            <TextField
-              label="Application Category ID"
-              fullWidth
-              margin="dense"
-              value={editingApp?.applicationCategoryId || ""}
-              onChange={(e) => setEditingApp({ ...editingApp, applicationCategoryId: e.target.value })}
-              helperText="Enter the ID of the application category (e.g., 3fa85f64-5717-4562-b3fc-2c963f66afa6)"
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseAppDialog}>Cancel</Button>
-            <Button onClick={handleSaveApp} color="primary">Save</Button>
-          </DialogActions>
-        </Dialog>
-      )}
+          </Box>
+        </Box>
+        <Divider sx={{ marginY: "10px" }} />
+        {applications.length > 0 ? (
+          applications.map((app) => (
+            <Box key={app.id} sx={{ marginBottom: "10px" }}>
+              <Typography variant="body1">
+                <strong>
+                  {applicationCategories.find((cat) => cat.id === app.applicationCategoryId)?.name || "Unknown Category"}:
+                </strong>{" "}
+                {app.applicationName} - {app.description}
+              </Typography>
+            </Box>
+          ))
+        ) : (
+          <Typography color="text.secondary">No applications found.</Typography>
+        )}
+      </Paper>
     </Box>
   );
 };

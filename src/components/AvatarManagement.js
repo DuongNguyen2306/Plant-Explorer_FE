@@ -21,32 +21,20 @@ import {
   IconButton,
   CircularProgress,
   Snackbar,
-  Alert
+  Alert,
+  Fade,
+  Tooltip,
 } from "@mui/material";
+import { styled } from "@mui/system";
 import { Edit, Delete } from "@mui/icons-material";
 import { BASE_API } from "../constant";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 
-// Danh sách avatar mặc định (chỉ dùng để hiển thị khi không có dữ liệu từ API)
+// Default avatars
 const DEFAULT_AVATARS = [
-  {
-    id: "default-1",
-    name: "Avatar 1",
-    imageUrl: "https://cdn-icons-png.flaticon.com/512/147/147142.png",
-    isDefault: true, // Đánh dấu là avatar mặc định
-  },
-  {
-    id: "default-2",
-    name: "Avatar 2",
-    imageUrl: "https://cdn-icons-png.flaticon.com/512/6858/6858485.png",
-    isDefault: true,
-  },
-  {
-    id: "default-3",
-    name: "Avatar 3",
-    imageUrl: "https://www.svgrepo.com/show/382106/male-avatar-boy-face-man-user-9.svg",
-    isDefault: true,
-  },
+  { id: "default-1", name: "Avatar 1", imageUrl: "https://cdn-icons-png.flaticon.com/512/147/147142.png", isDefault: true },
+  { id: "default-2", name: "Avatar 2", imageUrl: "https://cdn-icons-png.flaticon.com/512/6858/6858485.png", isDefault: true },
+  { id: "default-3", name: "Avatar 3", imageUrl: "https://www.svgrepo.com/show/382106/male-avatar-boy-face-man-user-9.svg", isDefault: true },
 ];
 
 const AVATAR_OPTIONS = [
@@ -59,9 +47,37 @@ const AVATAR_OPTIONS = [
 
 const API_URL = BASE_API + "/avatars";
 
+// Styled components
+const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
+  borderRadius: "12px",
+  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
+  background: "linear-gradient(145deg, #ffffff, #f9fbfc)",
+  width: "100%",
+  maxWidth: "1200px",
+  margin: "0 auto",
+}));
+
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  padding: "20px 30px", // Increased padding for more space inside cells
+  fontSize: "1.1rem",
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+  borderRadius: "25px",
+  padding: "8px 20px", // Adjusted padding for buttons
+  textTransform: "none",
+  fontWeight: 500,
+  fontSize: "1rem",
+  transition: "all 0.3s ease",
+  "&:hover": {
+    transform: "translateY(-2px)",
+    boxShadow: "0 5px 15px rgba(0, 0, 0, 0.1)",
+  },
+}));
+
 const AvatarManagement = () => {
-  const [avatars, setAvatars] = useState([]); // Không khởi tạo với DEFAULT_AVATARS
-  const [serverAvatars, setServerAvatars] = useState([]); // Lưu danh sách avatar từ server
+  const [avatars, setAvatars] = useState([]);
+  const [serverAvatars, setServerAvatars] = useState([]);
   const [open, setOpen] = useState(false);
   const [editingAvatar, setEditingAvatar] = useState(null);
   const [search, setSearch] = useState("");
@@ -78,51 +94,30 @@ const AvatarManagement = () => {
     if (role === "staff" || role === "children") fetchAvatars();
   }, [role]);
 
-  const getAuthToken = () => {
-    const token = localStorage.getItem("token");
-    console.log("Retrieved token:", token);
-    return token || "";
-  };
+  const getAuthToken = () => localStorage.getItem("token") || "";
 
   const fetchAvatars = async () => {
     setLoading(true);
     setError(null);
     try {
       const token = getAuthToken();
-      if (!token) {
-        setSnackbar({ open: true, message: "Authorization token is missing! Please log in.", severity: "error" });
-        setLoading(false);
-        return;
-      }
-
-      const response = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      console.log("Avatars response:", response.data); // Debug
-      // Kiểm tra dữ liệu trả về
+      if (!token) throw new Error("Authorization token missing! Please log in.");
+      const response = await axios.get(API_URL, { headers: { Authorization: `Bearer ${token}` } });
       const fetchedAvatars = Array.isArray(response.data) ? response.data : response.data?.data || [];
-      // Thêm thuộc tính isDefault cho các avatar từ server
-      const updatedAvatars = fetchedAvatars.map((avatar) => ({
-        ...avatar,
-        isDefault: false, // Avatar từ server không phải là mặc định
-      }));
-      setServerAvatars(updatedAvatars); // Lưu danh sách avatar từ server
-      // Nếu không có avatar từ server, hiển thị DEFAULT_AVATARS
+      const updatedAvatars = fetchedAvatars.map((avatar) => ({ ...avatar, isDefault: false }));
+      setServerAvatars(updatedAvatars);
       setAvatars(updatedAvatars.length > 0 ? updatedAvatars : DEFAULT_AVATARS);
-      setLoading(false);
     } catch (error) {
-      console.error("Error fetching avatars:", error);
       setError("Failed to fetch avatars: " + (error.response?.data?.message || error.message));
-      setLoading(false);
-      setAvatars(DEFAULT_AVATARS); // Sử dụng danh sách mặc định nếu có lỗi
+      setAvatars(DEFAULT_AVATARS);
       setServerAvatars([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleOpenDialog = (avatar = null) => {
-    setEditingAvatar(
-      avatar || { id: "", name: "", imageUrl: AVATAR_OPTIONS[0] }
-    );
+    setEditingAvatar(avatar || { id: "", name: "", imageUrl: AVATAR_OPTIONS[0] });
     setOpen(true);
   };
 
@@ -140,45 +135,20 @@ const AvatarManagement = () => {
       setSnackbar({ open: true, message: "Invalid avatar selection.", severity: "warning" });
       return;
     }
-
     try {
       const token = getAuthToken();
-      if (!token) {
-        setSnackbar({ open: true, message: "Authorization token is missing! Please log in.", severity: "error" });
-        return;
-      }
-
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      };
+      if (!token) throw new Error("Authorization token missing! Please log in.");
+      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
       if (editingAvatar.id && !editingAvatar.isDefault) {
-        // Cập nhật avatar
-        await axios.put(
-          `${API_URL}/${editingAvatar.id}`,
-          {
-            id: editingAvatar.id, // Thêm id vào body theo API documentation
-            imageUrl: editingAvatar.imageUrl,
-          },
-          { headers }
-        );
+        await axios.put(`${API_URL}/${editingAvatar.id}`, { id: editingAvatar.id, imageUrl: editingAvatar.imageUrl }, { headers });
         setSnackbar({ open: true, message: "Avatar updated successfully!", severity: "success" });
       } else {
-        // Tạo mới avatar
-        await axios.post(
-          API_URL,
-          {
-            name: editingAvatar.name,
-            imageUrl: editingAvatar.imageUrl,
-          },
-          { headers }
-        );
+        await axios.post(API_URL, { name: editingAvatar.name, imageUrl: editingAvatar.imageUrl }, { headers });
         setSnackbar({ open: true, message: "Avatar created successfully!", severity: "success" });
       }
       fetchAvatars();
       handleCloseDialog();
     } catch (error) {
-      console.error("Error saving avatar:", error);
       setSnackbar({ open: true, message: "Failed to save avatar: " + (error.response?.data?.message || error.message), severity: "error" });
     }
   };
@@ -187,233 +157,226 @@ const AvatarManagement = () => {
     if (window.confirm("Are you sure you want to delete this avatar?")) {
       try {
         const token = getAuthToken();
-        if (!token) {
-          setSnackbar({ open: true, message: "Authorization token is missing! Please log in.", severity: "error" });
-          return;
-        }
-
-        await axios.delete(`${API_URL}/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        if (!token) throw new Error("Authorization token missing! Please log in.");
+        await axios.delete(`${API_URL}/${id}`, { headers: { Authorization: `Bearer ${token}` } });
         fetchAvatars();
         setSnackbar({ open: true, message: "Avatar deleted successfully!", severity: "success" });
       } catch (error) {
-        console.error("Error deleting avatar:", error);
         setSnackbar({ open: true, message: "Failed to delete avatar: " + (error.response?.data?.message || error.message), severity: "error" });
       }
     }
   };
 
   const handleSelectAvatar = async (avatar) => {
-    // Không cho phép chọn avatar mặc định
     if (avatar.isDefault) {
-      setSnackbar({ open: true, message: "Cannot select a default avatar. Please create a new avatar or select an existing one from the server.", severity: "warning" });
+      setSnackbar({ open: true, message: "Cannot select a default avatar.", severity: "warning" });
       return;
     }
-
     try {
       const token = getAuthToken();
-      if (!token) {
-        setSnackbar({ open: true, message: "Authorization token is missing! Please log in.", severity: "error" });
-        return;
-      }
-
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      };
-      console.log("Selecting avatar:", avatar); // Debug
-      // Gọi API để cập nhật avatar cho user, sử dụng PUT theo Swagger
-      const response = await axios.put(
-        `${API_URL}/user/${avatar.id}`,
-        {}, // Không cần body theo Swagger
-        { headers }
-      );
-      console.log("Select avatar response:", response.data); // Debug
+      if (!token) throw new Error("Authorization token missing! Please log in.");
+      await axios.put(`${API_URL}/user/${avatar.id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
       localStorage.setItem("selectedAvatar", avatar.imageUrl);
-      setSnackbar({ open: true, message: `Avatar "${avatar.name}" has been selected!`, severity: "success" });
-      // Gửi sự kiện để Sidebar cập nhật
+      setSnackbar({ open: true, message: `Avatar "${avatar.name}" selected!`, severity: "success" });
       window.dispatchEvent(new Event("avatarUpdated"));
     } catch (error) {
-      console.error("Error selecting avatar:", error);
-      const errorMessage = error.response?.data?.message || error.message;
-      setSnackbar({ open: true, message: `Failed to select avatar: ${errorMessage}`, severity: "error" });
+      setSnackbar({ open: true, message: "Failed to select avatar: " + (error.response?.data?.message || error.message), severity: "error" });
     }
   };
 
-  if (role === null) return <p>Loading role...</p>;
-  if (role !== "staff" && role !== "children")
-    return <p style={{ color: "red" }}>You do not have permission to view avatars.</p>;
-  if (loading)
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", padding: "20px" }}>
-        <CircularProgress />
-      </Box>
-    );
-  if (error)
-    return (
-      <Box sx={{ padding: "20px" }}>
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
+  const filteredAvatars = avatars.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
 
-  const filteredAvatars = avatars.filter((a) =>
-    a.name.toLowerCase().includes(search.toLowerCase())
-  );
+  if (role === null) return <Typography variant="h6" align="center">Loading role...</Typography>;
+  if (role !== "staff" && role !== "children")
+    return <Typography variant="h6" align="center" color="error">Access Denied</Typography>;
 
   return (
-    <Box sx={{ padding: "20px" }}>
-      <Typography variant="h4" sx={{ fontWeight: "bold", marginBottom: "20px" }}>
-        Avatar Management
-      </Typography>
-      <Box sx={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
-        <TextField
-          label="Search Avatar"
-          variant="outlined"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ maxWidth: "400px", flex: 1 }}
-        />
+    <Box sx={{ padding: "40px", backgroundColor: "#f4f6f9", minHeight: "100vh" }}>
+      {/* Header Section */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600, color: "#2c3e50", fontSize: "2rem" }}>
+          Avatar Management
+        </Typography>
         {role === "staff" && (
-          <>
-            <Button
-              variant="contained"
-              color="success"
-              onClick={() => handleOpenDialog()}
-              sx={{ minWidth: "120px" }}
-            >
+          <Box sx={{ display: "flex", gap: 3 }}>
+            <StyledButton variant="contained" color="primary" onClick={() => handleOpenDialog()}>
               Add Avatar
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={fetchAvatars}
-              sx={{ minWidth: "120px" }}
-            >
+            </StyledButton>
+            <StyledButton variant="outlined" color="secondary" onClick={fetchAvatars}>
               Refresh
-            </Button>
-          </>
+            </StyledButton>
+          </Box>
         )}
       </Box>
 
-      {serverAvatars.length === 0 && (
-        <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
-          No avatars available on the server. Please create a new avatar to select.
+      {/* Search and Info */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4, maxWidth: "1200px", margin: "0 auto" }}>
+        <TextField
+          label="Search Avatars"
+          variant="outlined"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          sx={{ width: "400px", backgroundColor: "#fff", borderRadius: "8px", "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
+        />
+        <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1rem" }}>
+          Showing {filteredAvatars.length} of {avatars.length} avatars
+        </Typography>
+      </Box>
+
+      {/* Loading/Error States */}
+      {loading && (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
+          <CircularProgress size={50} />
+        </Box>
+      )}
+      {error && (
+        <Typography variant="body1" color="error" align="center" sx={{ py: 5, fontSize: "1.2rem" }}>
+          {error}
         </Typography>
       )}
 
-      <TableContainer component={Paper} sx={{ borderRadius: "10px", overflow: "hidden", boxShadow: 3 }}>
-        <Table>
-          <TableHead sx={{ backgroundColor: "#f1f1f1" }}>
-            <TableRow>
-              <TableCell><strong>Avatar</strong></TableCell>
-              <TableCell><strong>Name</strong></TableCell>
-              <TableCell><strong>Actions</strong></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredAvatars.map((avatar) => (
-              <TableRow key={avatar.id}>
-                <TableCell>
-                  <img
-                    src={avatar.imageUrl}
-                    alt={avatar.name}
-                    width={50}
-                    height={50}
-                    style={{ borderRadius: "50%" }}
-                    onError={(e) => (e.target.src = "https://via.placeholder.com/50?text=Error")} // Xử lý lỗi hình ảnh
-                  />
-                </TableCell>
-                <TableCell>{avatar.name}</TableCell>
-                <TableCell>
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={() => handleSelectAvatar(avatar)}
-                    sx={{ marginRight: "10px" }}
-                    disabled={avatar.isDefault || false} // Vô hiệu hóa nút Select cho avatar mặc định
-                  >
-                    Select
-                  </Button>
-                  {role === "staff" && (
-                    <>
-                      <IconButton
-                        onClick={() => handleOpenDialog(avatar)}
-                        sx={{ color: "#1976d2" }}
-                        disabled={avatar.isDefault || false} // Không cho phép chỉnh sửa avatar mặc định
-                      >
-                        <Edit fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        onClick={() => handleDelete(avatar.id)}
-                        sx={{ color: "#d32f2f" }}
-                        disabled={avatar.isDefault || false} // Không cho phép xóa avatar mặc định
-                      >
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </>
-                  )}
-                </TableCell>
+      {/* Table Section */}
+      {!loading && !error && (
+        <StyledTableContainer component={Paper}>
+          <Table>
+            <TableHead sx={{ backgroundColor: "#3498db" }}>
+              <TableRow>
+                <StyledTableCell sx={{ color: "#fff", fontWeight: 600, width: "20%" }}>Avatar</StyledTableCell>
+                <StyledTableCell sx={{ color: "#fff", fontWeight: 600, width: "30%" }}>Name</StyledTableCell>
+                <StyledTableCell sx={{ color: "#fff", fontWeight: 600, width: "50%", textAlign: "center" }}>Actions</StyledTableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {avatars.length === 0 && (
-        <Typography variant="h6" color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
-          No avatars found.
-        </Typography>
+            </TableHead>
+            <TableBody>
+              {filteredAvatars.length === 0 ? (
+                <TableRow>
+                  <StyledTableCell colSpan={3} align="center">
+                    <Fade in={true}>
+                      <Box sx={{ py: 6 }}>
+                        <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1.2rem" }}>
+                          {avatars.length === 0 ? "No avatars available." : "No avatars match your search."}
+                        </Typography>
+                        {role === "staff" && avatars.length === 0 && (
+                          <StyledButton
+                            variant="contained"
+                            color="primary"
+                            onClick={() => handleOpenDialog()}
+                            sx={{ mt: 3 }}
+                          >
+                            Create Avatar
+                          </StyledButton>
+                        )}
+                      </Box>
+                    </Fade>
+                  </StyledTableCell>
+                </TableRow>
+              ) : (
+                filteredAvatars.map((avatar, index) => (
+                  <Fade in={true} timeout={300 + index * 100} key={avatar.id}>
+                    <TableRow sx={{ "&:hover": { backgroundColor: "#ecf0f1" }, height: "90px" }}>
+                      <StyledTableCell>
+                        <img
+                          src={avatar.imageUrl}
+                          alt={avatar.name}
+                          width={70}
+                          height={70}
+                          style={{ borderRadius: "50%", objectFit: "cover" }}
+                          onError={(e) => (e.target.src = "https://via.placeholder.com/70?text=Error")}
+                        />
+                      </StyledTableCell>
+                      <StyledTableCell sx={{ fontSize: "1.2rem" }}>{avatar.name}</StyledTableCell>
+                      <StyledTableCell sx={{ textAlign: "center" }}>
+                        <Tooltip title="Select">
+                          <StyledButton
+                            variant="outlined"
+                            color="primary"
+                            onClick={() => handleSelectAvatar(avatar)}
+                            disabled={avatar.isDefault}
+                            sx={{ mr: 3, fontSize: "1rem", padding: "8px 24px" }}
+                          >
+                            Select
+                          </StyledButton>
+                        </Tooltip>
+                        {role === "staff" && (
+                          <>
+                            <Tooltip title="Edit">
+                              <IconButton
+                                onClick={() => handleOpenDialog(avatar)}
+                                disabled={avatar.isDefault}
+                                sx={{ color: "#1976d2", mr: 2 }}
+                              >
+                                <Edit fontSize="medium" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete">
+                              <IconButton
+                                onClick={() => handleDelete(avatar.id)}
+                                disabled={avatar.isDefault}
+                                sx={{ color: "#d32f2f" }}
+                              >
+                                <Delete fontSize="medium" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
+                      </StyledTableCell>
+                    </TableRow>
+                  </Fade>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </StyledTableContainer>
       )}
-      {avatars.length > 0 && filteredAvatars.length === 0 && (
-        <Typography variant="h6" color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
-          No avatars match your search.
-        </Typography>
-      )}
 
+      {/* Dialog for Add/Edit */}
       {role === "staff" && (
         <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-          <DialogTitle>{editingAvatar?.id ? "Edit Avatar" : "Add Avatar"}</DialogTitle>
-          <DialogContent>
+          <DialogTitle sx={{ backgroundColor: "#3498db", color: "#fff", fontWeight: 600, fontSize: "1.5rem", py: 2 }}>
+            {editingAvatar?.id ? "Edit Avatar" : "Add New Avatar"}
+          </DialogTitle>
+          <DialogContent sx={{ pt: 4 }}>
             <TextField
-              label="Name"
+              label="Avatar Name"
               fullWidth
-              margin="dense"
               value={editingAvatar?.name || ""}
               onChange={(e) => setEditingAvatar({ ...editingAvatar, name: e.target.value })}
+              sx={{ mb: 4, "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
             />
             <Select
               fullWidth
               value={editingAvatar?.imageUrl || AVATAR_OPTIONS[0]}
               onChange={(e) => setEditingAvatar({ ...editingAvatar, imageUrl: e.target.value })}
-              sx={{ marginTop: "10px" }}
+              sx={{ "& .MuiSelect-select": { fontSize: "1.1rem", py: 1.5 } }}
             >
               {AVATAR_OPTIONS.map((url, index) => (
-                <MenuItem key={index} value={url}>
+                <MenuItem key={index} value={url} sx={{ py: 1.5 }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
                     <img
                       src={url}
                       alt={`avatar-${index}`}
-                      width={30}
-                      height={30}
-                      style={{ marginRight: 10, borderRadius: "50%" }}
-                      onError={(e) => (e.target.src = "https://via.placeholder.com/30?text=Error")} // Xử lý lỗi hình ảnh
+                      width={40}
+                      height={40}
+                      style={{ borderRadius: "50%", marginRight: 15 }}
+                      onError={(e) => (e.target.src = "https://via.placeholder.com/40?text=Error")}
                     />
-                    Avatar {index + 1}
+                    <Typography sx={{ fontSize: "1.1rem" }}>Avatar {index + 1}</Typography>
                   </Box>
                 </MenuItem>
               ))}
             </Select>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button onClick={handleSaveAvatar} color="primary">
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <StyledButton onClick={handleCloseDialog} color="inherit" variant="outlined">
+              Cancel
+            </StyledButton>
+            <StyledButton onClick={handleSaveAvatar} variant="contained" color="primary">
               Save
-            </Button>
+            </StyledButton>
           </DialogActions>
         </Dialog>
       )}
 
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}

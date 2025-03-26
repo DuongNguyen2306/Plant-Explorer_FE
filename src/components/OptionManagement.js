@@ -5,7 +5,7 @@ import {
   Card, CardContent, Typography, Button, Grid, Box, Pagination,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   FormControlLabel, Checkbox, IconButton, CardMedia, CircularProgress,
-  Snackbar, Alert,
+  Snackbar, Alert, Container
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -24,7 +24,7 @@ const OptionManagement = () => {
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const rowsPerPage = 6;
+  const rowsPerPage = 8; // Set to 8 to fit 4 options per row (2 rows per page)
 
   useEffect(() => {
     getUserRoleFromAPI().then(setRole);
@@ -109,10 +109,10 @@ const OptionManagement = () => {
       };
 
       if (editingOption.id) {
-        await axios.put(`${API_URL}/${editingOption.id}`, payload, { headers }); // Sửa theo API documentation
+        await axios.put(`${API_URL}/${editingOption.id}`, payload, { headers });
         setSnackbar({ open: true, message: "Option updated successfully!", severity: "success" });
       } else {
-        await axios.post(API_URL, payload, { headers }); // Sửa theo API documentation
+        await axios.post(API_URL, payload, { headers });
         setSnackbar({ open: true, message: "Option added successfully!", severity: "success" });
       }
       fetchOptions();
@@ -136,7 +136,7 @@ const OptionManagement = () => {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`${API_URL}/${id}`, { headers }); // Sửa theo API documentation
+      await axios.delete(`${API_URL}/${id}`, { headers });
       fetchOptions();
       setSnackbar({ open: true, message: "Option deleted successfully!", severity: "success" });
     } catch (error) {
@@ -163,8 +163,16 @@ const OptionManagement = () => {
   );
 
   return (
-    <Box sx={{ padding: 4, backgroundColor: "#e3eafc", minHeight: "100vh" }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
+    <Container maxWidth="lg" sx={{ py: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
+      {/* Header Section */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
         <Typography variant="h4" fontWeight="bold" color="primary">
           Option Management
         </Typography>
@@ -176,6 +184,11 @@ const OptionManagement = () => {
               startIcon={<AddCircle />}
               onClick={() => handleOpenDialog()}
               disabled={loading}
+              sx={{
+                borderRadius: "20px",
+                textTransform: "none",
+                fontWeight: "bold",
+              }}
             >
               Add Option
             </Button>
@@ -185,6 +198,11 @@ const OptionManagement = () => {
               startIcon={<Refresh />}
               onClick={fetchOptions}
               disabled={loading}
+              sx={{
+                borderRadius: "20px",
+                textTransform: "none",
+                fontWeight: "bold",
+              }}
             >
               Refresh
             </Button>
@@ -192,39 +210,65 @@ const OptionManagement = () => {
         )}
       </Box>
 
+      {/* Loading Indicator */}
       {loading && (
         <Box sx={{ display: "flex", justifyContent: "center", my: 3 }}>
           <CircularProgress />
         </Box>
       )}
 
-      <Grid container spacing={3}>
+      {/* Options Grid */}
+      <Grid container spacing={2}>
         {options.slice((page - 1) * rowsPerPage, page * rowsPerPage).map((option) => (
-          <Grid item xs={12} sm={6} md={4} key={option.id}>
-            <Card sx={{ borderRadius: 3, boxShadow: 3, textAlign: "center", transition: "transform 0.2s", "&:hover": { transform: "scale(1.02)" } }}>
+          <Grid item xs={12} sm={6} md={3} key={option.id}>
+            <Card
+              sx={{
+                borderRadius: "15px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                transition: "transform 0.2s, box-shadow 0.2s",
+                "&:hover": {
+                  transform: "scale(1.02)",
+                  boxShadow: "0 6px 16px rgba(0,0,0,0.15)",
+                },
+              }}
+            >
               <CardMedia
                 component="img"
-                height="160"
-                image={"https://via.placeholder.com/300x160?text=Option"}
+                height="140"
+                image={"https://via.placeholder.com/300x140?text=Option"}
                 alt="Option"
                 sx={{ objectFit: "cover" }}
               />
-              <CardContent>
+              <CardContent sx={{ padding: "12px", textAlign: "center" }}>
                 <Typography variant="h6" fontWeight="bold" sx={{ minHeight: "3rem" }}>
                   {option.context || "No Text"}
                 </Typography>
                 {option.isCorrect ? (
-                  <CheckCircleIcon color="success" sx={{ fontSize: 40, mt: 1 }} />
+                  <CheckCircleIcon color="success" sx={{ fontSize: 30, mt: 1 }} />
                 ) : (
-                  <CancelIcon color="error" sx={{ fontSize: 40, mt: 1 }} />
+                  <CancelIcon color="error" sx={{ fontSize: 30, mt: 1 }} />
                 )}
                 {role === "staff" && (
                   <Box sx={{ display: "flex", justifyContent: "center", mt: 2, gap: 1 }}>
-                    <IconButton color="info" onClick={() => handleOpenDialog(option)} disabled={loading}>
-                      <Edit />
+                    <IconButton
+                      color="info"
+                      onClick={() => handleOpenDialog(option)}
+                      disabled={loading}
+                      sx={{
+                        "&:hover": { backgroundColor: "rgba(25, 118, 210, 0.1)" },
+                      }}
+                    >
+                      <Edit fontSize="small" />
                     </IconButton>
-                    <IconButton color="error" onClick={() => handleDelete(option.id)} disabled={loading}>
-                      <Delete />
+                    <IconButton
+                      color="error"
+                      onClick={() => handleDelete(option.id)}
+                      disabled={loading}
+                      sx={{
+                        "&:hover": { backgroundColor: "rgba(211, 47, 47, 0.1)" },
+                      }}
+                    >
+                      <Delete fontSize="small" />
                     </IconButton>
                   </Box>
                 )}
@@ -234,23 +278,32 @@ const OptionManagement = () => {
         ))}
       </Grid>
 
+      {/* No Options Message */}
       {options.length === 0 && !loading && (
         <Typography variant="h6" color="text.secondary" textAlign="center" mt={5}>
           No options found. {role === "staff" ? "Add a new option to get started!" : ""}
         </Typography>
       )}
 
+      {/* Pagination */}
       {totalPages > 1 && (
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 4, mb: 2 }}>
           <Pagination
             count={totalPages}
             page={page}
             onChange={(e, value) => setPage(value)}
             color="primary"
+            size="large"
+            sx={{
+              "& .MuiPaginationItem-root": {
+                fontSize: "1.1rem",
+              },
+            }}
           />
         </Box>
       )}
 
+      {/* Dialog for Adding/Editing Options */}
       {role === "staff" && (
         <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ bgcolor: "primary.main", color: "white" }}>
@@ -266,6 +319,7 @@ const OptionManagement = () => {
               required
               error={!editingOption?.name}
               helperText={!editingOption?.name ? "Name is required" : ""}
+              variant="outlined"
             />
             <TextField
               label="Context"
@@ -276,6 +330,7 @@ const OptionManagement = () => {
               required
               error={!editingOption?.context}
               helperText={!editingOption?.context ? "Context is required" : ""}
+              variant="outlined"
             />
             <FormControlLabel
               control={
@@ -289,15 +344,28 @@ const OptionManagement = () => {
               label="Is Correct?"
             />
           </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={handleCloseDialog} disabled={loading}>Cancel</Button>
-            <Button onClick={handleSave} color="primary" variant="contained" disabled={loading}>
+          <DialogActions sx={{ p: 2, bgcolor: "#f5f7fa", borderTop: "1px solid #e0e0e0" }}>
+            <Button
+              onClick={handleCloseDialog}
+              disabled={loading}
+              sx={{ textTransform: "none", fontWeight: "bold" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              color="primary"
+              variant="contained"
+              disabled={loading}
+              sx={{ borderRadius: "20px", textTransform: "none", fontWeight: "bold" }}
+            >
               {loading ? <CircularProgress size={24} /> : "Save"}
             </Button>
           </DialogActions>
         </Dialog>
       )}
 
+      {/* Snackbar for Notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
@@ -307,7 +375,7 @@ const OptionManagement = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </Container>
   );
 };
 
