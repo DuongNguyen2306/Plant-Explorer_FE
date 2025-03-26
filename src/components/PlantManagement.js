@@ -72,7 +72,7 @@ const PlantManagement = () => {
   }, [role, search, debouncedFetchPlants]);
 
   const handleOpenDialog = (plant = null) => {
-    setEditingPlant(plant || { name: "", scientificName: "", category: "", description: "" });
+    setEditingPlant(plant || { name: "", scientificName: "", description: "" });
     setOpen(true);
   };
 
@@ -90,8 +90,7 @@ const PlantManagement = () => {
 
       const data = {
         name: editingPlant.name,
-        scientificName: editingPlant.scientificName,
-        category: editingPlant.category,
+        scientificName: editingPlant.scientificName, // Sửa lỗi cú pháp ở đây
         description: editingPlant.description || "",
       };
 
@@ -176,7 +175,6 @@ const PlantManagement = () => {
             <TableRow>
               <TableCell><strong>Name</strong></TableCell>
               <TableCell><strong>Scientific Name</strong></TableCell>
-              <TableCell><strong>Category</strong></TableCell>
               <TableCell><strong>Actions</strong></TableCell>
             </TableRow>
           </TableHead>
@@ -185,7 +183,6 @@ const PlantManagement = () => {
               <TableRow key={plant.id}>
                 <TableCell>{plant.name}</TableCell>
                 <TableCell>{plant.scientificName}</TableCell>
-                <TableCell>{plant.category}</TableCell>
                 <TableCell>
                   <Button
                     variant="outlined"
@@ -244,13 +241,6 @@ const PlantManagement = () => {
               margin="dense"
               value={editingPlant?.scientificName || ""}
               onChange={(e) => setEditingPlant({ ...editingPlant, scientificName: e.target.value })}
-            />
-            <TextField
-              label="Category"
-              fullWidth
-              margin="dense"
-              value={editingPlant?.category || ""}
-              onChange={(e) => setEditingPlant({ ...editingPlant, category: e.target.value })}
             />
             <TextField
               label="Description"

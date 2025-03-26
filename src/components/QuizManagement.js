@@ -17,8 +17,11 @@ import {
   DialogTitle,
   IconButton,
   Pagination,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
-import { Edit, Delete } from "@mui/icons-material";
+import { Edit, Delete, Refresh } from "@mui/icons-material";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 import "../css/QuizManagement.css";
 
@@ -31,6 +34,9 @@ const QuizManagement = () => {
   const [open, setOpen] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState(null);
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const quizzesPerPage = 6;
   const navigate = useNavigate();
 
@@ -40,20 +46,45 @@ const QuizManagement = () => {
 
   useEffect(() => {
     if (role === "staff" || role === "children") fetchQuizzes();
-  }, [role]);
+  }, [role, page]);
 
   const fetchQuizzes = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setSnackbar({ open: true, message: "Authentication token is required to fetch quizzes!", severity: "error" });
+      return;
+    }
+
+    setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}?index=1&pageSize=100`, {
+      const index = page; // Theo API documentation, index bắt đầu từ 1
+      const res = await axios.get(API_URL, {
+        params: {
+          index: index,
+          pageSize: quizzesPerPage,
+        },
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${token}`,
         },
       });
+
       const fetchedQuizzes = res.data?.data?.items || [];
+      const totalItems = res.data?.data?.totalCount || 0;
+
       setQuizzes(fetchedQuizzes);
+      setTotalPages(Math.ceil(totalItems / quizzesPerPage));
+
+      if (fetchedQuizzes.length === 0) {
+        setSnackbar({ open: true, message: "No quizzes found.", severity: "info" });
+      } else {
+        setSnackbar({ open: true, message: "Quizzes loaded successfully!", severity: "success" });
+      }
     } catch (error) {
-      console.error("Error fetching quizzes:", error);
-      alert("Failed to fetch quizzes: " + (error.response?.data?.message || error.message));
+      const errorMessage = error.response?.data?.message || error.message || "Failed to fetch quizzes.";
+      console.error("Full error response:", error.response);
+      setSnackbar({ open: true, message: `Error fetching quizzes: ${errorMessage}`, severity: "error" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -68,48 +99,78 @@ const QuizManagement = () => {
   };
 
   const handleSaveQuiz = async () => {
+    if (!editingQuiz.name) {
+      setSnackbar({ open: true, message: "Quiz name is required!", severity: "warning" });
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setSnackbar({ open: true, message: "Authentication token is required to save quizzes!", severity: "error" });
+      return;
+    }
+
+    // Kiểm tra imageUrl chỉ khi tạo mới (không có id)
+    if (!editingQuiz.id && (!editingQuiz.imageUrl || editingQuiz.imageUrl.trim() === "")) {
+      setSnackbar({ open: true, message: "Please provide a valid image URL for the new quiz!", severity: "warning" });
+      return;
+    }
+
     try {
       const headers = {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       };
 
+      // Chỉ gửi các trường name và imageUrl theo API documentation
       const data = {
         name: editingQuiz.name,
-        imageUrl: editingQuiz.imageUrl || "",
-        description: editingQuiz.description || "",
+        imageUrl: editingQuiz.imageUrl || "", // Nếu không có imageUrl, gửi chuỗi rỗng (sẽ bị backend từ chối nếu không hợp lệ)
       };
 
+      setLoading(true);
       if (editingQuiz.id) {
-        await axios.put(`${API_URL}/quiz?id=${editingQuiz.id}`, data, { headers });
+        // Cập nhật quiz (PUT)
+        await axios.put(`${API_URL}/${editingQuiz.id}`, { ...data, description: editingQuiz.description || "" }, { headers });
+        setSnackbar({ open: true, message: "Quiz updated successfully!", severity: "success" });
       } else {
-        if (!editingQuiz.imageUrl) {
-          alert("Please provide an image URL for the new quiz");
-          return;
-        }
-        await axios.post(`${API_URL}/quiz`, data, { headers });
+        // Thêm quiz mới (POST)
+        await axios.post(API_URL, data, { headers }); // Sửa URL từ /api/quizzes/quiz thành /api/quizzes
+        setSnackbar({ open: true, message: "Quiz added successfully!", severity: "success" });
       }
       await fetchQuizzes();
       handleCloseDialog();
-      alert("Quiz saved successfully!");
     } catch (error) {
-      console.error("Error saving quiz:", error);
-      alert("Failed to save quiz: " + (error.response?.data?.message || error.message));
+      const errorMessage = error.response?.data?.message || error.message || "Failed to save quiz.";
+      console.error("Full error response:", error.response);
+      setSnackbar({ open: true, message: `Error saving quiz: ${errorMessage}`, severity: "error" });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDeleteQuiz = async (id) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setSnackbar({ open: true, message: "Authentication token is required to delete quizzes!", severity: "error" });
+      return;
+    }
+
+    setLoading(true);
     try {
-      await axios.delete(`${API_URL}/quiz?id=${id}`, {
+      await axios.delete(`${API_URL}/${id}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       await fetchQuizzes();
-      alert("Quiz deleted successfully!");
+      setSnackbar({ open: true, message: "Quiz deleted successfully!", severity: "success" });
     } catch (error) {
-      console.error("Error deleting quiz:", error);
-      alert("Failed to delete quiz: " + (error.response?.data?.message || error.message));
+      const errorMessage = error.response?.data?.message || error.message || "Failed to delete quiz.";
+      console.error("Full error response:", error.response);
+      setSnackbar({ open: true, message: `Error deleting quiz: ${errorMessage}`, severity: "error" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -117,11 +178,19 @@ const QuizManagement = () => {
     quiz.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalPages = Math.ceil(filteredQuizzes.length / quizzesPerPage);
-  const currentQuizzes = filteredQuizzes.slice((page - 1) * quizzesPerPage, page * quizzesPerPage);
+  if (role === null) return (
+    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+      <CircularProgress />
+    </Box>
+  );
 
-  if (role === null) return <p>Loading...</p>;
-  if (role !== "staff" && role !== "children") return <p style={{ color: "red" }}>You do not have permission to access Quiz Management.</p>;
+  if (role !== "staff" && role !== "children") return (
+    <Box sx={{ textAlign: "center", mt: 5 }}>
+      <Typography variant="h6" color="error">
+        You do not have permission to access Quiz Management.
+      </Typography>
+    </Box>
+  );
 
   return (
     <Box className="quiz-management-container">
@@ -148,14 +217,17 @@ const QuizManagement = () => {
                 variant="contained"
                 color="success"
                 onClick={() => handleOpenDialog()}
+                disabled={loading}
                 sx={{ minWidth: 120 }}
               >
                 Add Quiz
               </Button>
               <Button
                 onClick={fetchQuizzes}
-                variant="contained"
+                variant="outlined"
                 color="primary"
+                startIcon={<Refresh />}
+                disabled={loading}
                 sx={{ minWidth: 120 }}
               >
                 Refresh
@@ -165,10 +237,17 @@ const QuizManagement = () => {
         </Box>
       </Box>
 
+      {/* Loading Indicator */}
+      {loading && (
+        <Box sx={{ display: "flex", justifyContent: "center", my: 3 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
       {/* Quiz Cards Section */}
       <Box className="quiz-list-container">
         <Grid container spacing={4}>
-          {currentQuizzes.map((quiz) => (
+          {filteredQuizzes.map((quiz) => (
             <Grid item xs={12} sm={6} md={6} key={quiz.id}>
               <Card className="quiz-card">
                 <CardMedia
@@ -179,7 +258,7 @@ const QuizManagement = () => {
                       : "https://via.placeholder.com/300"
                   }
                   alt={quiz.name}
-                  onError={(e) => (e.target.src = "https://via.placeholder.com/300")} // Xử lý lỗi hình ảnh
+                  onError={(e) => (e.target.src = "https://via.placeholder.com/300")}
                 />
                 <CardContent className="quiz-card-content">
                   <Typography variant="h5" fontWeight="bold" gutterBottom>
@@ -201,12 +280,14 @@ const QuizManagement = () => {
                       <IconButton
                         className="edit-icon"
                         onClick={() => handleOpenDialog(quiz)}
+                        disabled={loading}
                       >
                         <Edit />
                       </IconButton>
                       <IconButton
                         className="delete-icon"
                         onClick={() => handleDeleteQuiz(quiz.id)}
+                        disabled={loading}
                       >
                         <Delete />
                       </IconButton>
@@ -218,21 +299,23 @@ const QuizManagement = () => {
           ))}
         </Grid>
 
-        {filteredQuizzes.length === 0 && (
+        {filteredQuizzes.length === 0 && !loading && (
           <Typography variant="h6" color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
             No quizzes found.
           </Typography>
         )}
 
-        <Box className="quiz-pagination">
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={(e, value) => setPage(value)}
-            color="primary"
-            size="large"
-          />
-        </Box>
+        {totalPages > 1 && (
+          <Box className="quiz-pagination">
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(e, value) => setPage(value)}
+              color="primary"
+              size="large"
+            />
+          </Box>
+        )}
       </Box>
 
       {role === "staff" && (
@@ -245,6 +328,9 @@ const QuizManagement = () => {
               margin="dense"
               value={editingQuiz?.name || ""}
               onChange={(e) => setEditingQuiz({ ...editingQuiz, name: e.target.value })}
+              required
+              error={!editingQuiz?.name}
+              helperText={!editingQuiz?.name ? "Quiz name is required" : ""}
             />
             <TextField
               label="Image URL"
@@ -252,6 +338,9 @@ const QuizManagement = () => {
               margin="dense"
               value={editingQuiz?.imageUrl || ""}
               onChange={(e) => setEditingQuiz({ ...editingQuiz, imageUrl: e.target.value })}
+              required={!editingQuiz?.id} // Chỉ bắt buộc khi tạo mới
+              error={!editingQuiz?.id && (!editingQuiz?.imageUrl || editingQuiz?.imageUrl.trim() === "")}
+              helperText={!editingQuiz?.id && (!editingQuiz?.imageUrl || editingQuiz?.imageUrl.trim() === "") ? "Image URL is required for new quizzes" : ""}
             />
             {editingQuiz?.imageUrl && (
               <Box sx={{ mt: 2 }}>
@@ -266,6 +355,7 @@ const QuizManagement = () => {
                   }
                   alt="Quiz preview"
                   onError={(e) => (e.target.src = "https://via.placeholder.com/300")}
+                  style={{ maxWidth: "100%", height: "auto" }}
                 />
               </Box>
             )}
@@ -280,11 +370,23 @@ const QuizManagement = () => {
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button onClick={handleSaveQuiz} color="primary">Save</Button>
+            <Button onClick={handleCloseDialog} disabled={loading}>Cancel</Button>
+            <Button onClick={handleSaveQuiz} color="primary" disabled={loading}>
+              {loading ? <CircularProgress size={24} /> : "Save"}
+            </Button>
           </DialogActions>
         </Dialog>
       )}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

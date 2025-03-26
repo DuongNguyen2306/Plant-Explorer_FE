@@ -20,6 +20,7 @@ import {
   Quiz,
   Badge,
   AccountCircle,
+  Category, // Thêm icon cho danh mục
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -29,11 +30,11 @@ import { getUserRoleFromAPI } from "../utils/roleUtils";
 const Sidebar = () => {
   const navigate = useNavigate();
   const [role, setRole] = useState(null);
-  const [username, setUsername] = useState("User"); // Mặc định là "User"
+  const [username, setUsername] = useState("User");
   const [selectedAvatar, setSelectedAvatar] = useState(
-    localStorage.getItem("selectedAvatar") || "https://via.placeholder.com/40" // Giá trị mặc định ban đầu
+    localStorage.getItem("selectedAvatar") || "https://via.placeholder.com/40"
   );
-  const [loading, setLoading] = useState(true); // Thêm trạng thái loading
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getUserRoleFromAPI()
@@ -47,7 +48,6 @@ const Sidebar = () => {
       });
   }, []);
 
-  // Lấy thông tin người dùng (bao gồm tên tài khoản và avatar)
   const fetchUserInfo = async () => {
     setLoading(true);
     try {
@@ -58,15 +58,13 @@ const Sidebar = () => {
       const response = await axios.get(`${BASE_API}/users/current-user`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log("User profile response:", response.data); // Debug
+      console.log("User profile response:", response.data);
       setUsername(response.data.data.username || "User");
-      // Kiểm tra xem API có trả về avatarUrl không
       const avatarUrl = response.data.data.avatarUrl || response.data.data.avatar?.imageUrl;
       if (avatarUrl) {
         setSelectedAvatar(avatarUrl);
-        localStorage.setItem("selectedAvatar", avatarUrl); // Đồng bộ với localStorage
+        localStorage.setItem("selectedAvatar", avatarUrl);
       } else {
-        // Nếu API không trả về avatar, sử dụng giá trị từ localStorage hoặc mặc định
         setSelectedAvatar(
           localStorage.getItem("selectedAvatar") || "https://via.placeholder.com/40"
         );
@@ -88,7 +86,6 @@ const Sidebar = () => {
     }
   }, [role]);
 
-  // Lắng nghe sự kiện avatarUpdated để cập nhật avatar mà không cần làm mới trang
   useEffect(() => {
     const handleAvatarUpdated = () => {
       fetchUserInfo();
@@ -120,6 +117,8 @@ const Sidebar = () => {
       ? [
           { text: "Quiz", icon: <Quiz />, path: "/quizzes" },
           { text: "Badge", icon: <Badge />, path: "/badges" },
+          { text: "Characteristic Categories", icon: <Category />, path: "/characteristic-categories" }, // Thêm mục mới
+          { text: "Application Categories", icon: <Category />, path: "/application-categories" }, // Thêm mục mới
         ]
       : []),
     ...(role
@@ -143,7 +142,7 @@ const Sidebar = () => {
             <Avatar
               src={selectedAvatar}
               alt="User Avatar"
-              onError={(e) => (e.target.src = "https://via.placeholder.com/40?text=Error")} // Xử lý lỗi hình ảnh
+              onError={(e) => (e.target.src = "https://via.placeholder.com/40?text=Error")}
             />
             <Typography variant="h6">{username}</Typography>
           </Box>

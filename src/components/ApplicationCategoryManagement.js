@@ -1,25 +1,27 @@
-// 📁 components/ApplicationCategoryManagement.js (Only staff allowed)
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
-  Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Paper, Button, TextField,
-  Dialog, DialogActions, DialogContent, DialogTitle
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
+  Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle,
+  Box, Typography
 } from "@mui/material";
 import { BASE_API } from "../constant";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 
-const API_URL = BASE_API + "/applicationcategory";
+const API_URL = BASE_API + "/application-category";
 
 const ApplicationCategoryManagement = () => {
   const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState({ name: "", description: "" });
+  const [editingCategory, setEditingCategory] = useState({ id: null, name: "" }); // Bỏ description
   const [role, setRole] = useState(null);
 
   useEffect(() => {
-    getUserRoleFromAPI().then(setRole);
+    getUserRoleFromAPI().then(setRole).catch(error => {
+      console.error("Error fetching role:", error);
+      setRole(null);
+    });
   }, []);
 
   useEffect(() => {
@@ -27,61 +29,121 @@ const ApplicationCategoryManagement = () => {
   }, [role]);
 
   const fetchCategories = async () => {
-    const { data } = await axios.get(API_URL, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-    setCategories(data);
+    try {
+      const { data } = await axios.get(API_URL, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      setCategories(data || []);
+    } catch (error) {
+      console.error("Error fetching application categories:", error.response?.data || error);
+      alert("Failed to fetch application categories: " + (error.response?.data?.message || error.message));
+      setCategories([]);
+    }
   };
 
   const saveCategory = async () => {
-    if (editingCategory.id) {
-      await axios.put(`${API_URL}/${editingCategory.id}`, editingCategory);
-    } else {
-      await axios.post(API_URL, editingCategory);
+    try {
+      const payload = {
+        name: editingCategory.name,
+      };
+      if (editingCategory.id) {
+        await axios.put(`${API_URL}/${editingCategory.id}`, payload, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        alert("Application category updated successfully!");
+      } else {
+        await axios.post(API_URL, payload, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        alert("Application category created successfully!");
+      }
+      fetchCategories();
+      setOpen(false);
+      setEditingCategory({ id: null, name: "" }); // Bỏ description
+    } catch (error) {
+      console.error("Error saving application category:", error.response?.data || error);
+      alert("Failed to save application category: " + (error.response?.data?.message || error.message));
     }
-    fetchCategories();
-    setOpen(false);
-    setEditingCategory({ name: "", description: "" });
   };
 
   const deleteCategory = async (id) => {
-    await axios.delete(`${API_URL}/${id}`);
-    fetchCategories();
+    if (window.confirm("Are you sure you want to delete this application category?")) {
+      try {
+        await axios.delete(`${API_URL}/${id}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        fetchCategories();
+        alert("Application category deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting application category:", error.response?.data || error);
+        alert("Failed to delete application category: " + (error.response?.data?.message || error.message));
+      }
+    }
   };
 
   if (role === null) return <p>Loading...</p>;
-  if (role !== "staff") return <p style={{ color: 'red' }}>You do not have permission to manage application categories.</p>;
+  if (role !== "staff") return <p style={{ color: "red" }}>You do not have permission to manage application categories.</p>;
 
   return (
-    <div>
-      <h2>Application Category Management</h2>
-      <TextField label="Search" fullWidth margin="normal"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)} />
-      <Button variant="contained" onClick={() => setOpen(true)}>Add Category</Button>
+    <Box sx={{ padding: "20px" }}>
+      <Typography variant="h4" sx={{ fontWeight: "bold", marginBottom: "20px" }}>
+        Application Category Management
+      </Typography>
+      <Box sx={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+        <TextField
+          label="Search by Name"
+          variant="outlined"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          fullWidth
+          sx={{ maxWidth: "400px" }}
+        />
+        <Button
+          variant="contained"
+          color="success"
+          onClick={() => setOpen(true)}
+          sx={{ minWidth: "120px" }}
+        >
+          Add Category
+        </Button>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={fetchCategories}
+          sx={{ minWidth: "120px" }}
+        >
+          Refresh
+        </Button>
+      </Box>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} sx={{ borderRadius: "10px", overflow: "hidden", boxShadow: 3 }}>
         <Table>
-          <TableHead>
+          <TableHead sx={{ backgroundColor: "#f1f1f1" }}>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Description</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell><strong>Name</strong></TableCell>
+              <TableCell><strong>Actions</strong></TableCell> {/* Bỏ cột Description */}
             </TableRow>
           </TableHead>
           <TableBody>
-            {categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).map(cat => (
-              <TableRow key={cat.id}>
-                <TableCell>{cat.name}</TableCell>
-                <TableCell>{cat.description}</TableCell>
-                <TableCell>
-                  <Button onClick={() => { setEditingCategory(cat); setOpen(true); }}>Edit</Button>
-                  <Button color="error" onClick={() => deleteCategory(cat.id)}>Delete</Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {categories
+              .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
+              .map((cat) => (
+                <TableRow key={cat.id}>
+                  <TableCell>{cat.name}</TableCell>
+                  <TableCell>
+                    <Button onClick={() => { setEditingCategory(cat); setOpen(true); }}>Edit</Button>
+                    <Button color="error" onClick={() => deleteCategory(cat.id)}>Delete</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
           </TableBody>
         </Table>
       </TableContainer>
@@ -89,19 +151,21 @@ const ApplicationCategoryManagement = () => {
       <Dialog open={open} onClose={() => setOpen(false)}>
         <DialogTitle>{editingCategory.id ? "Edit Category" : "Add Category"}</DialogTitle>
         <DialogContent>
-          <TextField label="Name" fullWidth margin="dense"
+          <TextField
+            label="Name"
+            fullWidth
+            margin="dense"
             value={editingCategory.name}
-            onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })} />
-          <TextField label="Description" fullWidth margin="dense"
-            value={editingCategory.description}
-            onChange={(e) => setEditingCategory({ ...editingCategory, description: e.target.value })} />
+            onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+          />
+          {/* Bỏ TextField cho description */}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
           <Button onClick={saveCategory}>Save</Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </Box>
   );
 };
 

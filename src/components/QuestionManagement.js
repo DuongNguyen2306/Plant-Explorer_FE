@@ -40,11 +40,17 @@ const QuestionManagement = () => {
       return;
     }
 
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setSnackbar({ open: true, message: "Authentication token is required to fetch questions!", severity: "error" });
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
-      const index = page - 1;
-      const token = localStorage.getItem("token"); // Lấy token từ localStorage
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const index = page; // Theo API documentation, index bắt đầu từ 1
+      const headers = { Authorization: `Bearer ${token}` };
 
       const res = await axios.get(API_URL, {
         params: {
@@ -70,12 +76,21 @@ const QuestionManagement = () => {
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || "Failed to fetch questions.";
+      console.error("Full error response:", error.response);
       setSnackbar({ open: true, message: `Error fetching questions: ${errorMessage}`, severity: "error" });
-      console.error("Error fetching questions:", error);
-      // Nếu lỗi 400 và thông điệp cho biết không tìm thấy câu hỏi, hiển thị thông báo "No questions found"
-      if (error.response?.status === 400 && errorMessage.toLowerCase().includes("not found")) {
-        setQuestions([]);
-        setSnackbar({ open: true, message: "No questions found for this quiz.", severity: "info" });
+
+      if (error.response?.status === 400) {
+        if (errorMessage.toLowerCase().includes("not found")) {
+          setQuestions([]);
+          setSnackbar({ open: true, message: "No questions found for this quiz.", severity: "info" });
+        } else if (errorMessage.toLowerCase().includes("quiz not found")) {
+          setQuestions([]);
+          setSnackbar({ open: true, message: "Quiz not found. Please check the Quiz ID.", severity: "error" });
+        } else if (errorMessage.toLowerCase().includes("invalid index")) {
+          setSnackbar({ open: true, message: "Invalid page index. Please try a different page.", severity: "error" });
+        } else {
+          setSnackbar({ open: true, message: `Error fetching questions: ${errorMessage}`, severity: "error" });
+        }
       }
     } finally {
       setLoading(false);
@@ -83,17 +98,22 @@ const QuestionManagement = () => {
   };
 
   const handleDelete = async (id) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setSnackbar({ open: true, message: "Authentication token is required to delete questions!", severity: "error" });
+      return;
+    }
+
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers = { Authorization: `Bearer ${token}` };
       await axios.delete(`${API_URL}/${id}`, { headers });
       fetchQuestions();
       setSnackbar({ open: true, message: "Question deleted successfully!", severity: "success" });
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Failed to delete question.";
-      setSnackbar({ open: true, message: errorMessage, severity: "error" });
-      console.error("Error deleting question:", error);
+      console.error("Full error response:", error.response);
+      setSnackbar({ open: true, message: `Error deleting question: ${errorMessage}`, severity: "error" });
     } finally {
       setLoading(false);
     }
@@ -117,6 +137,12 @@ const QuestionManagement = () => {
       return;
     }
 
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setSnackbar({ open: true, message: "Authentication token is required to save questions!", severity: "error" });
+      return;
+    }
+
     const payload = {
       name: editingQuestion.name,
       quizId: quizId,
@@ -127,8 +153,7 @@ const QuestionManagement = () => {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
       if (editingQuestion?.id) {
         await axios.put(`${API_URL}/${editingQuestion.id}`, payload, { headers });
@@ -141,8 +166,8 @@ const QuestionManagement = () => {
       handleCloseDialog();
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Failed to save question.";
-      setSnackbar({ open: true, message: errorMessage, severity: "error" });
-      console.error("Error saving question:", error);
+      console.error("Full error response:", error.response);
+      setSnackbar({ open: true, message: `Error saving question: ${errorMessage}`, severity: "error" });
     } finally {
       setLoading(false);
     }
