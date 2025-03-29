@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import {
@@ -19,17 +19,79 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
-  Container,
+  InputAdornment,
+  Fade,
 } from "@mui/material";
-import { Edit, Delete, Refresh, AddCircle } from "@mui/icons-material";
+import { styled } from "@mui/system";
+import { Edit, Delete, Refresh, AddCircle, Search } from "@mui/icons-material";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
+import debounce from "lodash/debounce";
 import "../css/QuizManagement.css";
 
 const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/quizzes";
 
+// Styled Components
+const StyledCard = styled(Card)(({ theme }) => ({
+  borderRadius: "15px",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+  transition: "transform 0.3s ease, box-shadow 0.3s ease",
+  "&:hover": {
+    transform: "scale(1.05)",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+  },
+  backgroundColor: "#fff",
+  height: "100%",
+  display: "flex",
+  flexDirection: "column",
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+  borderRadius: "20px",
+  padding: "8px 20px",
+  textTransform: "none",
+  fontWeight: 600,
+  fontSize: "1rem",
+  transition: "all 0.3s ease",
+  "&:hover": {
+    transform: "translateY(-2px)",
+    boxShadow: "0 6px 15px rgba(0, 0, 0, 0.15)",
+  },
+}));
+
+const StyledSearchField = styled(TextField)(({ theme }) => ({
+  width: { xs: "100%", sm: "400px", md: "500px" },
+  maxWidth: "100%",
+  backgroundColor: "#fff",
+  borderRadius: "30px",
+  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
+  "& .MuiInputBase-root": {
+    fontSize: "1.1rem",
+    padding: "4px 12px",
+  },
+  "& .MuiOutlinedInput-root": {
+    "& fieldset": {
+      borderColor: "#3498db",
+    },
+    "&:hover fieldset": {
+      borderColor: "#2980b9",
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: "#3498db",
+    },
+  },
+  "& .MuiInputLabel-root": {
+    color: "#3498db",
+    fontWeight: 500,
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: "#2980b9",
+  },
+}));
+
 const QuizManagement = () => {
   const [role, setRole] = useState(null);
   const [quizzes, setQuizzes] = useState([]);
+  const [filteredQuizzes, setFilteredQuizzes] = useState([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState(null);
@@ -37,18 +99,14 @@ const QuizManagement = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const quizzesPerPage = 8; // Updated to 8 to fit 4 quizzes per row (2 rows per page)
+  const quizzesPerPage = 8; // 8 quizzes per page (4 per row, 2 rows)
   const navigate = useNavigate();
 
   useEffect(() => {
     getUserRoleFromAPI().then(setRole);
   }, []);
 
-  useEffect(() => {
-    if (role === "staff" || role === "children") fetchQuizzes();
-  }, [role, page]);
-
-  const fetchQuizzes = async () => {
+  const fetchQuizzes = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       setSnackbar({ open: true, message: "Authentication token is required to fetch quizzes!", severity: "error" });
@@ -57,10 +115,9 @@ const QuizManagement = () => {
 
     setLoading(true);
     try {
-      const index = page;
       const res = await axios.get(API_URL, {
         params: {
-          index: index,
+          index: page,
           pageSize: quizzesPerPage,
         },
         headers: {
@@ -72,6 +129,7 @@ const QuizManagement = () => {
       const totalItems = res.data?.data?.totalCount || 0;
 
       setQuizzes(fetchedQuizzes);
+      setFilteredQuizzes(fetchedQuizzes);
       setTotalPages(Math.ceil(totalItems / quizzesPerPage));
 
       if (fetchedQuizzes.length === 0) {
@@ -86,7 +144,26 @@ const QuizManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
+
+  useEffect(() => {
+    if (role === "staff" || role === "children") fetchQuizzes();
+  }, [role, fetchQuizzes]);
+
+  const handleSearch = useCallback(
+    debounce((query) => {
+      const filtered = quizzes.filter((quiz) =>
+        quiz.name.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredQuizzes(filtered);
+      setPage(1); // Reset to first page on search
+    }, 500),
+    [quizzes]
+  );
+
+  useEffect(() => {
+    handleSearch(search);
+  }, [search, handleSearch]);
 
   const handleOpenDialog = (quiz = null) => {
     setEditingQuiz(quiz || { name: "", imageUrl: "", description: "" });
@@ -170,224 +247,225 @@ const QuizManagement = () => {
     }
   };
 
-  const filteredQuizzes = quizzes.filter(quiz =>
-    quiz.name.toLowerCase().includes(search.toLowerCase())
-  );
+  if (role === null)
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f5f7fa" }}>
+        <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
+      </Box>
+    );
 
-  if (role === null) return (
-    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
-      <CircularProgress />
-    </Box>
-  );
-
-  if (role !== "staff" && role !== "children") return (
-    <Box sx={{ textAlign: "center", mt: 5 }}>
-      <Typography variant="h6" color="error">
-        You do not have permission to access Quiz Management.
-      </Typography>
-    </Box>
-  );
+  if (role !== "staff" && role !== "children")
+    return (
+      <Box sx={{ textAlign: "center", mt: 8, p: 4, background: "#fff", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", maxWidth: "600px", mx: "auto" }}>
+        <Typography variant="h5" color="error" sx={{ fontWeight: 600 }}>
+          Access Denied
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+          You do not have permission to view this page.
+        </Typography>
+      </Box>
+    );
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
+    <Box
+      sx={{
+        padding: "32px",
+        background: "linear-gradient(135deg, #e8f0fe, #f5f7fa)",
+        minHeight: "100vh",
+        ml: { xs: 0, md: "280px" },
+        maxWidth: "100%",
+        overflowX: "hidden",
+      }}
+    >
       {/* Header Section */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <Typography variant="h4" fontWeight="bold" color="primary">
-          Quiz Management
-        </Typography>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4, flexWrap: "wrap", gap: 2 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 700, color: "#2c3e50", fontSize: { xs: "1.5rem", md: "2rem" } }}>
+            Quiz Management
+          </Typography>
+          <Typography variant="subtitle1" sx={{ color: "#7f8c8d", fontSize: { xs: "1rem", md: "1.2rem" }, mt: 1 }}>
+            Manage your quizzes ({filteredQuizzes.length} quizzes)
+          </Typography>
+        </Box>
         <Box sx={{ display: "flex", gap: 2 }}>
-          <TextField
-            label="Search Quiz"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            variant="outlined"
-            size="small"
-            sx={{ width: 300 }}
-          />
           {role === "staff" && (
             <>
-              <Button
+              <StyledButton
                 variant="contained"
-                color="success"
                 startIcon={<AddCircle />}
                 onClick={() => handleOpenDialog()}
                 disabled={loading}
-                sx={{
-                  borderRadius: "20px",
-                  textTransform: "none",
-                  fontWeight: "bold",
-                }}
+                sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}
               >
                 Add Quiz
-              </Button>
-              <Button
-                onClick={fetchQuizzes}
+              </StyledButton>
+              <StyledButton
                 variant="outlined"
-                color="primary"
                 startIcon={<Refresh />}
+                onClick={fetchQuizzes}
                 disabled={loading}
-                sx={{
-                  borderRadius: "20px",
-                  textTransform: "none",
-                  fontWeight: "bold",
-                }}
+                sx={{ borderColor: "#3498db", color: "#3498db" }}
               >
                 Refresh
-              </Button>
+              </StyledButton>
             </>
           )}
         </Box>
       </Box>
 
+      {/* Search Section */}
+      <Box sx={{ mb: 4, display: "flex", justifyContent: "center" }}>
+        <StyledSearchField
+          label="Search Quiz"
+          variant="outlined"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search sx={{ color: "#3498db", fontSize: "1.8rem" }} />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
+
       {/* Loading Indicator */}
       {loading && (
-        <Box sx={{ display: "flex", justifyContent: "center", my: 3 }}>
-          <CircularProgress />
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
+          <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
         </Box>
       )}
 
       {/* Quiz Cards Section */}
-      <Box>
-        <Grid container spacing={2}>
-          {filteredQuizzes.map((quiz) => (
-            <Grid item xs={12} sm={6} md={3} key={quiz.id}>
-              <Card
+      {!loading && (
+        <Box>
+          <Grid container spacing={3}>
+            {filteredQuizzes.map((quiz, index) => (
+              <Grid item xs={12} sm={6} md={3} key={quiz.id}>
+                <Fade in={true} timeout={300 + index * 100}>
+                  <StyledCard>
+                    <CardMedia
+                      component="img"
+                      height="160"
+                      image={
+                        quiz.imageUrl && quiz.imageUrl !== "null"
+                          ? quiz.imageUrl
+                          : "https://via.placeholder.com/300"
+                      }
+                      alt={quiz.name}
+                      onError={(e) => (e.target.src = "https://via.placeholder.com/300")}
+                      sx={{ objectFit: "cover", borderTopLeftRadius: "15px", borderTopRightRadius: "15px" }}
+                    />
+                    <CardContent sx={{ padding: "16px", flexGrow: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                      <Box>
+                        <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ fontSize: "1.2rem", color: "#2c3e50" }}>
+                          {quiz.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: "0.9rem" }}>
+                          {quiz.description || "No description available"}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2 }}>
+                        <StyledButton
+                          variant="contained"
+                          onClick={() => navigate(`/quizzes/${quiz.id}/questions`)}
+                          sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)", fontSize: "0.9rem" }}
+                        >
+                          View
+                        </StyledButton>
+                        {role === "staff" && (
+                          <Box sx={{ display: "flex", gap: 1 }}>
+                            <IconButton
+                              onClick={() => handleOpenDialog(quiz)}
+                              disabled={loading}
+                              sx={{ color: "#1976d2", "&:hover": { color: "#1565c0" } }}
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              onClick={() => handleDeleteQuiz(quiz.id)}
+                              disabled={loading}
+                              sx={{ color: "#d32f2f", "&:hover": { color: "#b71c1c" } }}
+                            >
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        )}
+                      </Box>
+                    </CardContent>
+                  </StyledCard>
+                </Fade>
+              </Grid>
+            ))}
+          </Grid>
+
+          {filteredQuizzes.length === 0 && (
+            <Box sx={{ textAlign: "center", py: 8 }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontSize: "1.4rem", mb: 2 }}>
+                No quizzes found
+              </Typography>
+              {role === "staff" && (
+                <StyledButton
+                  variant="contained"
+                  startIcon={<AddCircle />}
+                  onClick={() => handleOpenDialog()}
+                  sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}
+                >
+                  Add Quiz
+                </StyledButton>
+              )}
+            </Box>
+          )}
+
+          {totalPages > 1 && (
+            <Box sx={{ display: "flex", justifyContent: "center", mt: 4, mb: 2 }}>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={(e, value) => setPage(value)}
+                color="primary"
+                size="large"
                 sx={{
-                  borderRadius: "15px",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                  transition: "transform 0.2s, box-shadow 0.2s",
-                  "&:hover": {
-                    transform: "scale(1.02)",
-                    boxShadow: "0 6px 16px rgba(0,0,0,0.15)",
+                  "& .MuiPaginationItem-root": {
+                    fontSize: "1.1rem",
+                    "&:hover": {
+                      backgroundColor: "#e3f2fd",
+                    },
+                  },
+                  "& .Mui-selected": {
+                    backgroundColor: "#3498db !important",
+                    color: "#fff",
                   },
                 }}
-              >
-                <CardMedia
-                  component="img"
-                  height="140"
-                  image={
-                    quiz.imageUrl && quiz.imageUrl !== "null"
-                      ? quiz.imageUrl
-                      : "https://via.placeholder.com/300"
-                  }
-                  alt={quiz.name}
-                  onError={(e) => (e.target.src = "https://via.placeholder.com/300")}
-                  sx={{ objectFit: "cover" }}
-                />
-                <CardContent sx={{ padding: "12px" }}>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom>
-                    {quiz.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {quiz.description || "No description available"}
-                  </Typography>
-                </CardContent>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "0 12px 12px",
-                  }}
-                >
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => navigate(`/quizzes/${quiz.id}/questions`)}
-                    sx={{
-                      borderRadius: "20px",
-                      textTransform: "none",
-                      fontWeight: "bold",
-                      fontSize: "0.8rem",
-                    }}
-                  >
-                    View
-                  </Button>
-                  {role === "staff" && (
-                    <Box sx={{ display: "flex", gap: 1 }}>
-                      <IconButton
-                        onClick={() => handleOpenDialog(quiz)}
-                        disabled={loading}
-                        sx={{
-                          color: "#1976d2",
-                          "&:hover": { backgroundColor: "rgba(25, 118, 210, 0.1)" },
-                        }}
-                      >
-                        <Edit fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        onClick={() => handleDeleteQuiz(quiz.id)}
-                        disabled={loading}
-                        sx={{
-                          color: "#d32f2f",
-                          "&:hover": { backgroundColor: "rgba(211, 47, 47, 0.1)" },
-                        }}
-                      >
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  )}
-                </Box>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+              />
+            </Box>
+          )}
+        </Box>
+      )}
 
-        {filteredQuizzes.length === 0 && !loading && (
-          <Typography variant="h6" color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
-            No quizzes found.
-          </Typography>
-        )}
-
-        {totalPages > 1 && (
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 4, mb: 2 }}>
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              color="primary"
-              size="large"
-              sx={{
-                "& .MuiPaginationItem-root": {
-                  fontSize: "1.1rem",
-                },
-              }}
-            />
-          </Box>
-        )}
-      </Box>
-
+      {/* Dialog for Add/Edit Quiz */}
       {role === "staff" && (
-        <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-          <DialogTitle sx={{ bgcolor: "primary.main", color: "white" }}>
-            {editingQuiz?.id ? "Edit Quiz" : "Add Quiz"}
+        <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { borderRadius: "16px" } }}>
+          <DialogTitle sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)", color: "#fff", fontSize: "1.8rem", fontWeight: 600, py: 2 }}>
+            {editingQuiz?.id ? "Edit Quiz" : "Add New Quiz"}
           </DialogTitle>
-          <DialogContent sx={{ padding: "20px" }}>
+          <DialogContent sx={{ pt: 3 }}>
             <TextField
               label="Quiz Name"
               fullWidth
-              margin="dense"
+              margin="normal"
               value={editingQuiz?.name || ""}
               onChange={(e) => setEditingQuiz({ ...editingQuiz, name: e.target.value })}
               required
               error={!editingQuiz?.name}
               helperText={!editingQuiz?.name ? "Quiz name is required" : ""}
-              variant="outlined"
+              sx={{ "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
             />
             <TextField
               label="Image URL"
               fullWidth
-              margin="dense"
+              margin="normal"
               value={editingQuiz?.imageUrl || ""}
               onChange={(e) => setEditingQuiz({ ...editingQuiz, imageUrl: e.target.value })}
               required={!editingQuiz?.id}
@@ -397,11 +475,11 @@ const QuizManagement = () => {
                   ? "Image URL is required for new quizzes"
                   : ""
               }
-              variant="outlined"
+              sx={{ "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
             />
             {editingQuiz?.imageUrl && (
               <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: "1rem" }}>
                   Preview Image:
                 </Typography>
                 <img
@@ -412,52 +490,49 @@ const QuizManagement = () => {
                   }
                   alt="Quiz preview"
                   onError={(e) => (e.target.src = "https://via.placeholder.com/300")}
-                  style={{ maxWidth: "100%", height: "auto", borderRadius: "8px" }}
+                  style={{ maxWidth: "100%", height: "auto", borderRadius: "8px", marginTop: "8px" }}
                 />
               </Box>
             )}
             <TextField
               label="Description"
               fullWidth
-              margin="dense"
+              margin="normal"
               multiline
               rows={3}
               value={editingQuiz?.description || ""}
               onChange={(e) => setEditingQuiz({ ...editingQuiz, description: e.target.value })}
-              variant="outlined"
+              sx={{ "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
             />
           </DialogContent>
-          <DialogActions sx={{ padding: "16px", bgcolor: "#f5f7fa", borderTop: "1px solid #e0e0e0" }}>
-            <Button
-              onClick={handleCloseDialog}
-              disabled={loading}
-              sx={{ textTransform: "none", fontWeight: "bold" }}
-            >
+          <DialogActions sx={{ p: 3, justifyContent: "space-between" }}>
+            <StyledButton variant="outlined" onClick={handleCloseDialog} disabled={loading} sx={{ borderColor: "#3498db", color: "#3498db" }}>
               Cancel
-            </Button>
-            <Button
-              onClick={handleSaveQuiz}
-              color="primary"
+            </StyledButton>
+            <StyledButton
               variant="contained"
+              onClick={handleSaveQuiz}
               disabled={loading}
-              sx={{ borderRadius: "20px", textTransform: "none", fontWeight: "bold" }}
+              sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}
             >
-              {loading ? <CircularProgress size={24} /> : "Save"}
-            </Button>
+              {loading ? <CircularProgress size={24} color="inherit" /> : "Save"}
+            </StyledButton>
           </DialogActions>
         </Dialog>
       )}
 
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3000}
+        autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+        <Alert severity={snackbar.severity} sx={{ width: "100%", fontSize: "1.1rem" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 };
 

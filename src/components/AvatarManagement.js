@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import {
   Table,
@@ -24,11 +24,14 @@ import {
   Alert,
   Fade,
   Tooltip,
+  TablePagination,
+  InputAdornment,
 } from "@mui/material";
 import { styled } from "@mui/system";
-import { Edit, Delete } from "@mui/icons-material";
+import { Edit, Delete, Search, Refresh, Add } from "@mui/icons-material";
 import { BASE_API } from "../constant";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
+import debounce from "lodash/debounce";
 
 // Default avatars
 const DEFAULT_AVATARS = [
@@ -47,36 +50,81 @@ const AVATAR_OPTIONS = [
 
 const API_URL = BASE_API + "/avatars";
 
-// Styled components
+// Styled Components
 const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
-  borderRadius: "12px",
-  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
-  background: "linear-gradient(145deg, #ffffff, #f9fbfc)",
-  width: "100%",
-  maxWidth: "1200px",
+  borderRadius: "16px",
+  boxShadow: "0 8px 30px rgba(0, 0, 0, 0.12)",
+  background: "#fff",
   margin: "0 auto",
+  overflowX: "auto",
+  maxWidth: "100%",
 }));
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
-  padding: "20px 30px", // Increased padding for more space inside cells
+  padding: "18px 24px",
   fontSize: "1.1rem",
+  borderBottom: "1px solid rgba(224, 224, 224, 0.7)",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+}));
+
+const StyledTableHeadCell = styled(TableCell)(({ theme }) => ({
+  padding: "18px 24px",
+  fontSize: "1.2rem",
+  fontWeight: 700,
+  color: "#fff",
+  background: "linear-gradient(90deg, #2c3e50, #3498db)",
+  borderBottom: "none",
+  whiteSpace: "nowrap",
 }));
 
 const StyledButton = styled(Button)(({ theme }) => ({
-  borderRadius: "25px",
-  padding: "8px 20px", // Adjusted padding for buttons
+  borderRadius: "30px",
+  padding: "10px 24px",
   textTransform: "none",
-  fontWeight: 500,
+  fontWeight: 600,
   fontSize: "1rem",
   transition: "all 0.3s ease",
   "&:hover": {
     transform: "translateY(-2px)",
-    boxShadow: "0 5px 15px rgba(0, 0, 0, 0.1)",
+    boxShadow: "0 6px 15px rgba(0, 0, 0, 0.15)",
+  },
+}));
+
+const StyledSearchField = styled(TextField)(({ theme }) => ({
+  width: { xs: "100%", sm: "400px", md: "500px" },
+  maxWidth: "100%",
+  backgroundColor: "#fff",
+  borderRadius: "30px",
+  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
+  "& .MuiInputBase-root": {
+    fontSize: "1.1rem",
+    padding: "4px 12px",
+  },
+  "& .MuiOutlinedInput-root": {
+    "& fieldset": {
+      borderColor: "#3498db",
+    },
+    "&:hover fieldset": {
+      borderColor: "#2980b9",
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: "#3498db",
+    },
+  },
+  "& .MuiInputLabel-root": {
+    color: "#3498db",
+    fontWeight: 500,
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: "#2980b9",
   },
 }));
 
 const AvatarManagement = () => {
   const [avatars, setAvatars] = useState([]);
+  const [filteredAvatars, setFilteredAvatars] = useState([]);
   const [serverAvatars, setServerAvatars] = useState([]);
   const [open, setOpen] = useState(false);
   const [editingAvatar, setEditingAvatar] = useState(null);
@@ -85,18 +133,16 @@ const AvatarManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(5); // 5 avatars per page
 
   useEffect(() => {
     getUserRoleFromAPI().then(setRole);
   }, []);
 
-  useEffect(() => {
-    if (role === "staff" || role === "children") fetchAvatars();
-  }, [role]);
-
   const getAuthToken = () => localStorage.getItem("token") || "";
 
-  const fetchAvatars = async () => {
+  const fetchAvatars = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -107,14 +153,37 @@ const AvatarManagement = () => {
       const updatedAvatars = fetchedAvatars.map((avatar) => ({ ...avatar, isDefault: false }));
       setServerAvatars(updatedAvatars);
       setAvatars(updatedAvatars.length > 0 ? updatedAvatars : DEFAULT_AVATARS);
+      setFilteredAvatars(updatedAvatars.length > 0 ? updatedAvatars : DEFAULT_AVATARS);
+      setSnackbar({ open: true, message: "Avatars loaded successfully!", severity: "success" });
     } catch (error) {
       setError("Failed to fetch avatars: " + (error.response?.data?.message || error.message));
       setAvatars(DEFAULT_AVATARS);
+      setFilteredAvatars(DEFAULT_AVATARS);
       setServerAvatars([]);
+      setSnackbar({ open: true, message: "Failed to fetch avatars", severity: "error" });
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (role === "staff" || role === "children") fetchAvatars();
+  }, [role, fetchAvatars]);
+
+  const handleSearch = useCallback(
+    debounce((query) => {
+      const filtered = avatars.filter((avatar) =>
+        avatar.name.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredAvatars(filtered);
+      setPage(0); // Reset to first page on search
+    }, 500),
+    [avatars]
+  );
+
+  useEffect(() => {
+    handleSearch(search);
+  }, [search, handleSearch]);
 
   const handleOpenDialog = (avatar = null) => {
     setEditingAvatar(avatar || { id: "", name: "", imageUrl: AVATAR_OPTIONS[0] });
@@ -135,6 +204,7 @@ const AvatarManagement = () => {
       setSnackbar({ open: true, message: "Invalid avatar selection.", severity: "warning" });
       return;
     }
+    setLoading(true);
     try {
       const token = getAuthToken();
       if (!token) throw new Error("Authorization token missing! Please log in.");
@@ -150,11 +220,14 @@ const AvatarManagement = () => {
       handleCloseDialog();
     } catch (error) {
       setSnackbar({ open: true, message: "Failed to save avatar: " + (error.response?.data?.message || error.message), severity: "error" });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this avatar?")) {
+      setLoading(true);
       try {
         const token = getAuthToken();
         if (!token) throw new Error("Authorization token missing! Please log in.");
@@ -163,6 +236,8 @@ const AvatarManagement = () => {
         setSnackbar({ open: true, message: "Avatar deleted successfully!", severity: "success" });
       } catch (error) {
         setSnackbar({ open: true, message: "Failed to delete avatar: " + (error.response?.data?.message || error.message), severity: "error" });
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -172,6 +247,7 @@ const AvatarManagement = () => {
       setSnackbar({ open: true, message: "Cannot select a default avatar.", severity: "warning" });
       return;
     }
+    setLoading(true);
     try {
       const token = getAuthToken();
       if (!token) throw new Error("Authorization token missing! Please log in.");
@@ -181,69 +257,111 @@ const AvatarManagement = () => {
       window.dispatchEvent(new Event("avatarUpdated"));
     } catch (error) {
       setSnackbar({ open: true, message: "Failed to select avatar: " + (error.response?.data?.message || error.message), severity: "error" });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const filteredAvatars = avatars.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
+  if (role === null)
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f5f7fa" }}>
+        <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
+      </Box>
+    );
 
-  if (role === null) return <Typography variant="h6" align="center">Loading role...</Typography>;
   if (role !== "staff" && role !== "children")
-    return <Typography variant="h6" align="center" color="error">Access Denied</Typography>;
+    return (
+      <Box sx={{ textAlign: "center", mt: 8, p: 4, background: "#fff", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", maxWidth: "600px", mx: "auto" }}>
+        <Typography variant="h5" color="error" sx={{ fontWeight: 600 }}>
+          Access Denied
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+          You do not have permission to view this page.
+        </Typography>
+      </Box>
+    );
 
   return (
-    <Box sx={{ padding: "40px", backgroundColor: "#f4f6f9", minHeight: "100vh" }}>
+    <Box
+      sx={{
+        padding: "32px",
+        background: "linear-gradient(135deg, #e8f0fe, #f5f7fa)",
+        minHeight: "100vh",
+        ml: { xs: 0, md: "280px" },
+        maxWidth: "100%",
+        overflowX: "hidden",
+      }}
+    >
       {/* Header Section */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600, color: "#2c3e50", fontSize: "2rem" }}>
-          Avatar Management
-        </Typography>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4, flexWrap: "wrap", gap: 2 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 700, color: "#2c3e50", fontSize: { xs: "1.5rem", md: "2rem" } }}>
+            Avatar Management
+          </Typography>
+          <Typography variant="subtitle1" sx={{ color: "#7f8c8d", fontSize: { xs: "1rem", md: "1.2rem" }, mt: 1 }}>
+            Manage your avatars ({filteredAvatars.length} avatars)
+          </Typography>
+        </Box>
         {role === "staff" && (
-          <Box sx={{ display: "flex", gap: 3 }}>
-            <StyledButton variant="contained" color="primary" onClick={() => handleOpenDialog()}>
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <StyledButton variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()} sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}>
               Add Avatar
             </StyledButton>
-            <StyledButton variant="outlined" color="secondary" onClick={fetchAvatars}>
+            <StyledButton variant="outlined" startIcon={<Refresh />} onClick={fetchAvatars} sx={{ borderColor: "#3498db", color: "#3498db" }}>
               Refresh
             </StyledButton>
           </Box>
         )}
       </Box>
 
-      {/* Search and Info */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4, maxWidth: "1200px", margin: "0 auto" }}>
-        <TextField
+      {/* Search Section */}
+      <Box sx={{ mb: 4, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
+        <StyledSearchField
           label="Search Avatars"
           variant="outlined"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{ width: "400px", backgroundColor: "#fff", borderRadius: "8px", "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search sx={{ color: "#3498db", fontSize: "1.8rem" }} />
+              </InputAdornment>
+            ),
+          }}
         />
         <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1rem" }}>
-          Showing {filteredAvatars.length} of {avatars.length} avatars
+          Showing {filteredAvatars.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).length} of {filteredAvatars.length} avatars
         </Typography>
       </Box>
 
       {/* Loading/Error States */}
       {loading && (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
-          <CircularProgress size={50} />
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
+          <CircularProgress size={80} thickness={5} sx={{ color: "#" }} />
         </Box>
       )}
       {error && (
-        <Typography variant="body1" color="error" align="center" sx={{ py: 5, fontSize: "1.2rem" }}>
-          {error}
-        </Typography>
+        <Box sx={{ textAlign: "center", py: 8 }}>
+          <Typography variant="h6" color="error" sx={{ fontSize: "1.4rem", mb: 2 }}>
+            {error}
+          </Typography>
+          <StyledButton variant="outlined" onClick={fetchAvatars} sx={{ borderColor: "#3498db", color: "#3498db" }}>
+            Retry
+          </StyledButton>
+        </Box>
       )}
 
       {/* Table Section */}
       {!loading && !error && (
         <StyledTableContainer component={Paper}>
-          <Table>
-            <TableHead sx={{ backgroundColor: "#3498db" }}>
+          <Table sx={{ minWidth: "650px" }}>
+            <TableHead>
               <TableRow>
-                <StyledTableCell sx={{ color: "#fff", fontWeight: 600, width: "20%" }}>Avatar</StyledTableCell>
-                <StyledTableCell sx={{ color: "#fff", fontWeight: 600, width: "30%" }}>Name</StyledTableCell>
-                <StyledTableCell sx={{ color: "#fff", fontWeight: 600, width: "50%", textAlign: "center" }}>Actions</StyledTableCell>
+                <StyledTableHeadCell sx={{ width: { xs: "20%", md: "20%" }, minWidth: "150px" }}>Avatar</StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: { xs: "30%", md: "30%" }, minWidth: "200px" }}>Name</StyledTableHeadCell>
+                <StyledTableHeadCell align="center" sx={{ width: { xs: "50%", md: "50%" }, minWidth: "200px" }}>
+                  Actions
+                </StyledTableHeadCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -252,17 +370,15 @@ const AvatarManagement = () => {
                   <StyledTableCell colSpan={3} align="center">
                     <Fade in={true}>
                       <Box sx={{ py: 6 }}>
-                        <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1.2rem" }}>
-                          {avatars.length === 0 ? "No avatars available." : "No avatars match your search."}
+                        <Typography variant="h6" color="text.secondary" sx={{ fontSize: "1.4rem", mb: 2 }}>
+                          No avatars found
                         </Typography>
-                        {role === "staff" && avatars.length === 0 && (
-                          <StyledButton
-                            variant="contained"
-                            color="primary"
-                            onClick={() => handleOpenDialog()}
-                            sx={{ mt: 3 }}
-                          >
-                            Create Avatar
+                        <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1.1rem", mb: 4 }}>
+                          {role === "staff" ? "Add a new avatar to get started!" : "Check back later for updates."}
+                        </Typography>
+                        {role === "staff" && (
+                          <StyledButton variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()} sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}>
+                            Add Avatar
                           </StyledButton>
                         )}
                       </Box>
@@ -270,9 +386,15 @@ const AvatarManagement = () => {
                   </StyledTableCell>
                 </TableRow>
               ) : (
-                filteredAvatars.map((avatar, index) => (
+                filteredAvatars.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((avatar, index) => (
                   <Fade in={true} timeout={300 + index * 100} key={avatar.id}>
-                    <TableRow sx={{ "&:hover": { backgroundColor: "#ecf0f1" }, height: "90px" }}>
+                    <TableRow
+                      sx={{
+                        backgroundColor: index % 2 === 0 ? "#fafafa" : "#fff",
+                        "&:hover": { backgroundColor: "#e3f2fd", transition: "background-color 0.3s ease" },
+                        height: "90px",
+                      }}
+                    >
                       <StyledTableCell>
                         <img
                           src={avatar.imageUrl}
@@ -284,14 +406,13 @@ const AvatarManagement = () => {
                         />
                       </StyledTableCell>
                       <StyledTableCell sx={{ fontSize: "1.2rem" }}>{avatar.name}</StyledTableCell>
-                      <StyledTableCell sx={{ textAlign: "center" }}>
+                      <StyledTableCell align="center">
                         <Tooltip title="Select">
                           <StyledButton
                             variant="outlined"
-                            color="primary"
                             onClick={() => handleSelectAvatar(avatar)}
-                            disabled={avatar.isDefault}
-                            sx={{ mr: 3, fontSize: "1rem", padding: "8px 24px" }}
+                            disabled={avatar.isDefault || loading}
+                            sx={{ mr: 3, fontSize: "1rem", padding: "8px 24px", borderColor: "#3498db", color: "#3498db", "&:hover": { borderColor: "#2980b9", color: "#2980b9" } }}
                           >
                             Select
                           </StyledButton>
@@ -301,8 +422,8 @@ const AvatarManagement = () => {
                             <Tooltip title="Edit">
                               <IconButton
                                 onClick={() => handleOpenDialog(avatar)}
-                                disabled={avatar.isDefault}
-                                sx={{ color: "#1976d2", mr: 2 }}
+                                disabled={avatar.isDefault || loading}
+                                sx={{ color: "#1976d2", mr: 2, "&:hover": { color: "#1565c0" } }}
                               >
                                 <Edit fontSize="medium" />
                               </IconButton>
@@ -310,8 +431,8 @@ const AvatarManagement = () => {
                             <Tooltip title="Delete">
                               <IconButton
                                 onClick={() => handleDelete(avatar.id)}
-                                disabled={avatar.isDefault}
-                                sx={{ color: "#d32f2f" }}
+                                disabled={avatar.isDefault || loading}
+                                sx={{ color: "#d32f2f", "&:hover": { color: "#b71c1c" } }}
                               >
                                 <Delete fontSize="medium" />
                               </IconButton>
@@ -325,13 +446,22 @@ const AvatarManagement = () => {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={filteredAvatars.length}
+            page={page}
+            onPageChange={(e, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            rowsPerPageOptions={[5]}
+            sx={{ "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: "1.1rem" } }}
+          />
         </StyledTableContainer>
       )}
 
       {/* Dialog for Add/Edit */}
       {role === "staff" && (
-        <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-          <DialogTitle sx={{ backgroundColor: "#3498db", color: "#fff", fontWeight: 600, fontSize: "1.5rem", py: 2 }}>
+        <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { borderRadius: "16px" } }}>
+          <DialogTitle sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)", color: "#fff", fontSize: "1.8rem", fontWeight: 600, py: 2 }}>
             {editingAvatar?.id ? "Edit Avatar" : "Add New Avatar"}
           </DialogTitle>
           <DialogContent sx={{ pt: 4 }}>
@@ -341,6 +471,9 @@ const AvatarManagement = () => {
               value={editingAvatar?.name || ""}
               onChange={(e) => setEditingAvatar({ ...editingAvatar, name: e.target.value })}
               sx={{ mb: 4, "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
+              required
+              error={!editingAvatar?.name}
+              helperText={!editingAvatar?.name ? "Name is required" : ""}
             />
             <Select
               fullWidth
@@ -366,11 +499,11 @@ const AvatarManagement = () => {
             </Select>
           </DialogContent>
           <DialogActions sx={{ p: 3, gap: 2 }}>
-            <StyledButton onClick={handleCloseDialog} color="inherit" variant="outlined">
+            <StyledButton onClick={handleCloseDialog} variant="outlined" disabled={loading} sx={{ borderColor: "#3498db", color: "#3498db" }}>
               Cancel
             </StyledButton>
-            <StyledButton onClick={handleSaveAvatar} variant="contained" color="primary">
-              Save
+            <StyledButton onClick={handleSaveAvatar} variant="contained" disabled={loading} sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}>
+              {loading ? <CircularProgress size={24} color="inherit" /> : "Save"}
             </StyledButton>
           </DialogActions>
         </Dialog>
@@ -379,10 +512,11 @@ const AvatarManagement = () => {
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3000}
+        autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+        <Alert severity={snackbar.severity} sx={{ width: "100%", fontSize: "1.1rem" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

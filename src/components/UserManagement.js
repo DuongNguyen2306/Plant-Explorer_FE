@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import {
   Table,
@@ -24,10 +24,11 @@ import {
   CircularProgress,
   InputAdornment,
 } from "@mui/material";
-import { Edit, Delete, Add, Visibility, Search } from "@mui/icons-material";
+import { Edit, Delete, AddCircle, Visibility, Search } from "@mui/icons-material";
 import { styled } from "@mui/system";
 import { BASE_API } from "../constant";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
+import debounce from "lodash/debounce"; // You'll need to install lodash: `npm install lodash`
 
 const API_URL = BASE_API + "/users";
 const CREATE_STAFF_URL = BASE_API + "/users/staff";
@@ -41,6 +42,7 @@ const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
   margin: "0 auto",
   overflowX: "auto",
   maxWidth: "100%",
+  border: "1px solid rgba(224, 224, 224, 0.5)",
 }));
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
@@ -50,6 +52,11 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
+  color: "#2c3e50",
+  "&:hover": {
+    backgroundColor: "#f5f7fa",
+    transition: "background-color 0.3s ease",
+  },
 }));
 
 const StyledTableHeadCell = styled(TableCell)(({ theme }) => ({
@@ -63,8 +70,8 @@ const StyledTableHeadCell = styled(TableCell)(({ theme }) => ({
 }));
 
 const StyledButton = styled(Button)(({ theme }) => ({
-  borderRadius: "30px",
-  padding: "10px 24px",
+  borderRadius: "20px",
+  padding: "8px 20px",
   textTransform: "none",
   fontWeight: 600,
   fontSize: "1rem",
@@ -72,6 +79,35 @@ const StyledButton = styled(Button)(({ theme }) => ({
   "&:hover": {
     transform: "translateY(-2px)",
     boxShadow: "0 6px 15px rgba(0, 0, 0, 0.15)",
+  },
+}));
+
+const StyledTextField = styled(TextField)(({ theme }) => ({
+  width: "400px",
+  backgroundColor: "#fff",
+  borderRadius: "30px",
+  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
+  "& .MuiInputBase-root": {
+    fontSize: "1.1rem",
+    padding: "4px 12px",
+  },
+  "& .MuiOutlinedInput-root": {
+    "& fieldset": {
+      borderColor: "#1e88e5",
+    },
+    "&:hover fieldset": {
+      borderColor: "#1976d2",
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: "#1e88e5",
+    },
+  },
+  "& .MuiInputLabel-root": {
+    color: "#1e88e5",
+    fontWeight: 500,
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: "#1976d2",
   },
 }));
 
@@ -105,7 +141,7 @@ const UserManagement = () => {
       fetchUsers("children", search, pageChildren);
       fetchUsers("staff", search, pageStaff);
     }
-  }, [pageChildren, pageStaff, role]);
+  }, [pageChildren, pageStaff, role, search]); // Added 'search' to dependency array
 
   const fetchUsers = (userRole, query = "", page = 0) => {
     setLoading(true);
@@ -114,7 +150,7 @@ const UserManagement = () => {
         params: {
           index: page + 1,
           pageSize: rowsPerPage,
-          nameSearch: query,
+          nameSearch: query.trim(), // Ensure query is trimmed
           role: userRole,
         },
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -131,6 +167,23 @@ const UserManagement = () => {
       })
       .catch((error) => console.error(`Error fetching ${userRole} users:`, error))
       .finally(() => setLoading(false));
+  };
+
+  // Debounced search handler
+  const debouncedFetchUsers = useCallback(
+    debounce((query) => {
+      setPageChildren(0); // Reset to first page on search
+      setPageStaff(0);
+      fetchUsers("children", query, 0);
+      fetchUsers("staff", query, 0);
+    }, 500),
+    []
+  );
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearch(value);
+    debouncedFetchUsers(value);
   };
 
   const fetchQuizAttempts = (userId) => {
@@ -198,7 +251,6 @@ const UserManagement = () => {
         });
 
         if (response.status === 200) {
-          alert("User deleted successfully!");
           fetchUsers(userRole, search, userRole === "children" ? pageChildren : pageStaff);
         } else {
           throw new Error(`Unexpected response status: ${response.status}`);
@@ -257,7 +309,6 @@ const UserManagement = () => {
       })
       .then((response) => {
         if (response.status === 200) {
-          alert("User updated successfully!");
           fetchUsers(selectedUser.role, search, selectedUser.role === "children" ? pageChildren : pageStaff);
           setEditOpen(false);
         } else {
@@ -283,24 +334,22 @@ const UserManagement = () => {
     setTabValue(newValue);
   };
 
-  if (role === null)
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f5f7fa" }}>
-        <CircularProgress size={80} thickness={5} sx={{ color: "#1e88e5" }} />
-      </Box>
-    );
+  if (role === null) return (
+    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f5f7fa" }}>
+      <CircularProgress size={80} thickness={5} sx={{ color: "#1e88e5" }} />
+    </Box>
+  );
 
-  if (role !== "admin")
-    return (
-      <Box sx={{ textAlign: "center", mt: 8, p: 4, background: "#fff", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", maxWidth: "600px", mx: "auto" }}>
-        <Typography variant="h5" color="error" sx={{ fontWeight: 600 }}>
-          Access Denied
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
-          You do not have permission to view this page.
-        </Typography>
-      </Box>
-    );
+  if (role !== "admin") return (
+    <Box sx={{ textAlign: "center", mt: 8, p: 4, background: "#fff", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", maxWidth: "600px", mx: "auto" }}>
+      <Typography variant="h5" color="error" sx={{ fontWeight: 600 }}>
+        Access Denied
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+        You do not have permission to view this page.
+      </Typography>
+    </Box>
+  );
 
   return (
     <Box
@@ -309,60 +358,36 @@ const UserManagement = () => {
         background: "linear-gradient(135deg, #e8f0fe, #f5f7fa)",
         minHeight: "100vh",
         ml: { xs: 0, md: "280px" },
-        maxWidth: "100%",
         overflowX: "hidden",
       }}
     >
       {/* Header Section */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4, flexWrap: "wrap", gap: 2 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: "#1a237e", fontSize: { xs: "1.5rem", md: "2rem" } }}>
-          User Management
-        </Typography>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 700, color: "#2c3e50", fontSize: { xs: "1.5rem", md: "2rem" } }}>
+            User Management
+          </Typography>
+          <Typography variant="subtitle1" sx={{ color: "#7f8c8d", mt: 1 }}>
+            Total Users: {totalChildren + totalStaff}
+          </Typography>
+        </Box>
         <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-          <TextField
+          <StyledTextField
             label="Search Users"
             variant="outlined"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              if (e.target.value === "") {
-                fetchUsers("children", "", pageChildren);
-                fetchUsers("staff", "", pageStaff);
-              }
-            }}
-            sx={{
-              width: { xs: "100%", sm: "300px", md: "400px" },
-              maxWidth: "100%",
-              backgroundColor: "#fff",
-              borderRadius: "12px",
-              boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
-              "& .MuiInputBase-root": { fontSize: "1.1rem" },
-            }}
+            onChange={handleSearchChange}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
                   <Search sx={{ color: "#1e88e5", fontSize: "1.8rem" }} />
                 </InputAdornment>
               ),
-              endAdornment: (
-                <InputAdornment position="end">
-                  <StyledButton
-                    variant="contained"
-                    onClick={() => {
-                      fetchUsers("children", search, pageChildren);
-                      fetchUsers("staff", search, pageStaff);
-                    }}
-                    sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)", padding: "6px 16px" }}
-                  >
-                    Search
-                  </StyledButton>
-                </InputAdornment>
-              ),
             }}
           />
           <StyledButton
             variant="contained"
-            startIcon={<Add />}
+            startIcon={<AddCircle />}
             onClick={() => setOpen(true)}
             sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}
           >
@@ -377,7 +402,8 @@ const UserManagement = () => {
         onChange={handleTabChange}
         sx={{
           mb: 4,
-          "& .MuiTab-root": { fontSize: "1.1rem", fontWeight: 600, textTransform: "none" },
+          "& .MuiTab-root": { fontSize: "1.1rem", fontWeight: 600, textTransform: "none", color: "#2c3e50" },
+          "& .Mui-selected": { color: "#1e88e5" },
           "& .MuiTabs-indicator": { backgroundColor: "#1e88e5", height: "3px" },
         }}
       >
@@ -398,13 +424,11 @@ const UserManagement = () => {
           <Table sx={{ minWidth: "650px" }}>
             <TableHead>
               <TableRow>
-                <StyledTableHeadCell sx={{ width: { xs: "25%", md: "25%" }, minWidth: "150px" }}>Name</StyledTableHeadCell>
-                <StyledTableHeadCell sx={{ width: { xs: "25%", md: "25%" }, minWidth: "200px" }}>Email</StyledTableHeadCell>
-                <StyledTableHeadCell sx={{ width: { xs: "20%", md: "20%" }, minWidth: "150px" }}>Registration Date</StyledTableHeadCell>
-                <StyledTableHeadCell sx={{ width: { xs: "15%", md: "15%" }, minWidth: "100px" }}>Status</StyledTableHeadCell>
-                <StyledTableHeadCell align="center" sx={{ width: { xs: "15%", md: "15%" }, minWidth: "150px" }}>
-                  Actions
-                </StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "25%" }}>Name</StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "25%" }}>Email</StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "20%" }}>Registration Date</StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "15%" }}>Status</StyledTableHeadCell>
+                <StyledTableHeadCell align="center" sx={{ width: "15%" }}>Actions</StyledTableHeadCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -414,9 +438,9 @@ const UserManagement = () => {
                     <Fade in={true}>
                       <Box sx={{ py: 6 }}>
                         <Typography variant="h6" color="text.secondary" sx={{ fontSize: "1.4rem", mb: 2 }}>
-                          No children users found
+                          No Children Users Found
                         </Typography>
-                        <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1.1rem", mb: 4 }}>
+                        <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1.1rem" }}>
                           Try adjusting your search or check back later.
                         </Typography>
                       </Box>
@@ -432,19 +456,19 @@ const UserManagement = () => {
                         "&:hover": { backgroundColor: "#e3f2fd", transition: "background-color 0.3s ease" },
                       }}
                     >
-                      <StyledTableCell>{user.name}</StyledTableCell>
+                      <StyledTableCell sx={{ fontSize: "1.2rem", fontWeight: 500 }}>{user.name}</StyledTableCell>
                       <StyledTableCell>{user.email}</StyledTableCell>
                       <StyledTableCell>{user.createdTime}</StyledTableCell>
                       <StyledTableCell>{user.status === 1 ? "ACTIVE" : "LOCKED"}</StyledTableCell>
                       <StyledTableCell align="center">
                         <IconButton color="info" onClick={() => handleViewDetail({ ...user, role: "children" })} sx={{ "&:hover": { color: "#0288d1" } }}>
-                          <Visibility sx={{ fontSize: "1.8rem" }} />
+                          <Visibility />
                         </IconButton>
-                        <IconButton color="primary" onClick={() => handleEditClick({ ...user, role: "children" })} sx={{ "&:hover": { color: "#1e88e5" } }}>
-                          <Edit sx={{ fontSize: "1.8rem" }} />
+                        <IconButton color="primary" onClick={() => handleEditClick({ ...user, role: "children" })} sx={{ "&:hover": { color: "#1976d2" } }}>
+                          <Edit />
                         </IconButton>
                         <IconButton color="error" onClick={() => handleDeleteUser(user.id, "children")} sx={{ "&:hover": { color: "#d32f2f" } }}>
-                          <Delete sx={{ fontSize: "1.8rem" }} />
+                          <Delete />
                         </IconButton>
                       </StyledTableCell>
                     </TableRow>
@@ -460,6 +484,7 @@ const UserManagement = () => {
             onPageChange={(e, newPage) => setPageChildren(newPage)}
             rowsPerPage={rowsPerPage}
             rowsPerPageOptions={[5]}
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
             sx={{ "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: "1.1rem" } }}
           />
         </StyledTableContainer>
@@ -471,13 +496,11 @@ const UserManagement = () => {
           <Table sx={{ minWidth: "650px" }}>
             <TableHead>
               <TableRow>
-                <StyledTableHeadCell sx={{ width: { xs: "25%", md: "25%" }, minWidth: "150px" }}>Name</StyledTableHeadCell>
-                <StyledTableHeadCell sx={{ width: { xs: "25%", md: "25%" }, minWidth: "200px" }}>Email</StyledTableHeadCell>
-                <StyledTableHeadCell sx={{ width: { xs: "20%", md: "20%" }, minWidth: "150px" }}>Registration Date</StyledTableHeadCell>
-                <StyledTableHeadCell sx={{ width: { xs: "15%", md: "15%" }, minWidth: "100px" }}>Status</StyledTableHeadCell>
-                <StyledTableHeadCell align="center" sx={{ width: { xs: "15%", md: "15%" }, minWidth: "150px" }}>
-                  Actions
-                </StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "25%" }}>Name</StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "25%" }}>Email</StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "20%" }}>Registration Date</StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "15%" }}>Status</StyledTableHeadCell>
+                <StyledTableHeadCell align="center" sx={{ width: "15%" }}>Actions</StyledTableHeadCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -487,14 +510,14 @@ const UserManagement = () => {
                     <Fade in={true}>
                       <Box sx={{ py: 6 }}>
                         <Typography variant="h6" color="text.secondary" sx={{ fontSize: "1.4rem", mb: 2 }}>
-                          No staff users found
+                          No Staff Users Found
                         </Typography>
                         <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1.1rem", mb: 4 }}>
                           Add a new staff member to get started!
                         </Typography>
                         <StyledButton
                           variant="contained"
-                          startIcon={<Add />}
+                          startIcon={<AddCircle />}
                           onClick={() => setOpen(true)}
                           sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}
                         >
@@ -513,19 +536,19 @@ const UserManagement = () => {
                         "&:hover": { backgroundColor: "#e3f2fd", transition: "background-color 0.3s ease" },
                       }}
                     >
-                      <StyledTableCell>{user.name}</StyledTableCell>
+                      <StyledTableCell sx={{ fontSize: "1.2rem", fontWeight: 500 }}>{user.name}</StyledTableCell>
                       <StyledTableCell>{user.email}</StyledTableCell>
                       <StyledTableCell>{user.createdTime}</StyledTableCell>
                       <StyledTableCell>{user.status === 1 ? "ACTIVE" : "LOCKED"}</StyledTableCell>
                       <StyledTableCell align="center">
                         <IconButton color="info" onClick={() => handleViewDetail({ ...user, role: "staff" })} sx={{ "&:hover": { color: "#0288d1" } }}>
-                          <Visibility sx={{ fontSize: "1.8rem" }} />
+                          <Visibility />
                         </IconButton>
-                        <IconButton color="primary" onClick={() => handleEditClick({ ...user, role: "staff" })} sx={{ "&:hover": { color: "#1e88e5" } }}>
-                          <Edit sx={{ fontSize: "1.8rem" }} />
+                        <IconButton color="primary" onClick={() => handleEditClick({ ...user, role: "staff" })} sx={{ "&:hover": { color: "#1976d2" } }}>
+                          <Edit />
                         </IconButton>
                         <IconButton color="error" onClick={() => handleDeleteUser(user.id, "staff")} sx={{ "&:hover": { color: "#d32f2f" } }}>
-                          <Delete sx={{ fontSize: "1.8rem" }} />
+                          <Delete />
                         </IconButton>
                       </StyledTableCell>
                     </TableRow>
@@ -541,6 +564,7 @@ const UserManagement = () => {
             onPageChange={(e, newPage) => setPageStaff(newPage)}
             rowsPerPage={rowsPerPage}
             rowsPerPageOptions={[5]}
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
             sx={{ "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: "1.1rem" } }}
           />
         </StyledTableContainer>
@@ -551,7 +575,7 @@ const UserManagement = () => {
         <DialogTitle sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)", color: "#fff", fontSize: "1.8rem", fontWeight: 600, py: 2 }}>
           Create Staff
         </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
+        <DialogContent sx={{ pt: 4 }}>
           <TextField
             label="Name"
             fullWidth
@@ -601,8 +625,8 @@ const UserManagement = () => {
             sx={{ "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 3, justifyContent: "space-between" }}>
-          <StyledButton variant="outlined" onClick={() => setOpen(false)} disabled={loading} sx={{ borderColor: "#1e88e5", color: "#1e88e5" }}>
+        <DialogActions sx={{ p: 3, gap: 2 }}>
+          <StyledButton onClick={() => setOpen(false)} color="inherit" variant="outlined" disabled={loading}>
             Cancel
           </StyledButton>
           <StyledButton
@@ -621,13 +645,13 @@ const UserManagement = () => {
         <DialogTitle sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)", color: "#fff", fontSize: "1.8rem", fontWeight: 600, py: 2 }}>
           Edit User
         </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
+        <DialogContent sx={{ pt: 4 }}>
           <TextField
             label="Name"
             fullWidth
             margin="normal"
             value={selectedUser.name}
-            onChange={(e) => setSelectedUser({ ...selectedUser, name: e.target.value })}
+            onChange={(e) => setSelectedUser({ ...newUser, name: e.target.value })}
             required
             sx={{ "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
           />
@@ -637,7 +661,7 @@ const UserManagement = () => {
             margin="normal"
             type="number"
             value={selectedUser.age}
-            onChange={(e) => setSelectedUser({ ...selectedUser, age: Number(e.target.value) })}
+            onChange={(e) => setSelectedUser({ ...newUser, age: Number(e.target.value) })}
             required
             sx={{ "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
           />
@@ -646,7 +670,7 @@ const UserManagement = () => {
             fullWidth
             margin="normal"
             value={selectedUser.phoneNumber || ""}
-            onChange={(e) => setSelectedUser({ ...selectedUser, phoneNumber: e.target.value })}
+            onChange={(e) => setSelectedUser({ ...newUser, phoneNumber: e.target.value })}
             sx={{ "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
           />
           <TextField
@@ -654,12 +678,12 @@ const UserManagement = () => {
             fullWidth
             margin="normal"
             value={selectedUser.avatarUrl || ""}
-            onChange={(e) => setSelectedUser({ ...selectedUser, avatarUrl: e.target.value })}
+            onChange={(e) => setSelectedUser({ ...newUser, avatarUrl: e.target.value })}
             sx={{ "& .MuiInputBase-root": { fontSize: "1.1rem" } }}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 3, justifyContent: "space-between" }}>
-          <StyledButton variant="outlined" onClick={() => setEditOpen(false)} disabled={loading} sx={{ borderColor: "#1e88e5", color: "#1e88e5" }}>
+        <DialogActions sx={{ p: 3, gap: 2 }}>
+          <StyledButton onClick={() => setEditOpen(false)} color="inherit" variant="outlined" disabled={loading}>
             Cancel
           </StyledButton>
           <StyledButton
@@ -678,7 +702,7 @@ const UserManagement = () => {
         <DialogTitle sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)", color: "#fff", fontSize: "1.8rem", fontWeight: 600, py: 2 }}>
           User Details
         </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
+        <DialogContent sx={{ pt: 4 }}>
           {selectedUserDetails && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <Typography variant="body1" sx={{ fontSize: "1.1rem" }}>
@@ -708,7 +732,11 @@ const UserManagement = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <StyledButton variant="outlined" onClick={() => setDetailOpen(false)} sx={{ borderColor: "#1e88e5", color: "#1e88e5" }}>
+          <StyledButton
+            variant="outlined"
+            onClick={() => setDetailOpen(false)}
+            sx={{ borderColor: "#1e88e5", color: "#1e88e5" }}
+          >
             Close
           </StyledButton>
         </DialogActions>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -27,7 +27,7 @@ import {
 import { styled } from "@mui/system";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import { Edit, Delete, AddCircle, Refresh, Park } from "@mui/icons-material";
+import { Edit, Delete, AddCircle, Refresh, Park, ArrowBack } from "@mui/icons-material";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 
 const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/options";
@@ -36,17 +36,20 @@ const API_URL = "https://plant-explorer-backend-0-0-1.onrender.com/api/options";
 const StyledCard = styled(Card)(({ theme }) => ({
   borderRadius: "15px",
   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-  transition: "transform 0.2s, box-shadow 0.2s",
+  transition: "transform 0.3s ease, box-shadow 0.3s ease",
   "&:hover": {
-    transform: "scale(1.02)",
-    boxShadow: "0 6px 16px rgba(0,0,0,0.15)",
+    transform: "scale(1.05)",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
   },
-  background: "linear-gradient(145deg, #ffffff, #f0f4f8)",
+  backgroundColor: "#fff",
+  height: "100%",
+  display: "flex",
+  flexDirection: "column",
 }));
 
 const StyledButton = styled(Button)(({ theme }) => ({
-  borderRadius: "30px",
-  padding: "10px 24px",
+  borderRadius: "20px",
+  padding: "8px 20px",
   textTransform: "none",
   fontWeight: 600,
   fontSize: "1rem",
@@ -59,6 +62,9 @@ const StyledButton = styled(Button)(({ theme }) => ({
 
 const OptionManagement = () => {
   const { questionId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const quizId = location.state?.quizId;
   const [options, setOptions] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -67,7 +73,7 @@ const OptionManagement = () => {
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const rowsPerPage = 8; // 4 options per row, 2 rows per page
+  const rowsPerPage = 8;
 
   useEffect(() => {
     getUserRoleFromAPI().then(setRole);
@@ -85,7 +91,7 @@ const OptionManagement = () => {
 
     const token = localStorage.getItem("token");
     if (!token) {
-      setSnackbar({ open: true, message: "Authentication token is required to fetch options!", severity: "error" });
+      setSnackbar({ open: true, message: "Authentication token is required!", severity: "error" });
       return;
     }
 
@@ -93,25 +99,17 @@ const OptionManagement = () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const res = await axios.get(API_URL, {
-        params: {
-          questionId: questionId,
-        },
+        params: { questionId: questionId },
         headers: headers,
       });
 
       const fetchedOptions = res.data?.data?.items || [];
       setOptions(fetchedOptions);
       setTotalPages(Math.ceil(fetchedOptions.length / rowsPerPage));
-
-      if (fetchedOptions.length === 0) {
-        setSnackbar({ open: true, message: "No options found for this question.", severity: "info" });
-      } else {
-        setSnackbar({ open: true, message: "Options loaded successfully!", severity: "success" });
-      }
+      setSnackbar({ open: true, message: "Options loaded successfully!", severity: "success" });
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to fetch options.";
-      console.error("Full error response:", error.response);
-      setSnackbar({ open: true, message: `Error fetching options: ${errorMessage}`, severity: "error" });
+      setSnackbar({ open: true, message: "Failed to fetch options!", severity: "error" });
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -134,10 +132,7 @@ const OptionManagement = () => {
     }
 
     const token = localStorage.getItem("token");
-    if (!token) {
-      setSnackbar({ open: true, message: "Authentication token is required to save options!", severity: "error" });
-      return;
-    }
+    if (!token) return;
 
     setLoading(true);
     try {
@@ -159,9 +154,8 @@ const OptionManagement = () => {
       fetchOptions();
       handleCloseDialog();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to save option.";
-      console.error("Full error response:", error.response);
-      setSnackbar({ open: true, message: `Error saving option: ${errorMessage}`, severity: "error" });
+      setSnackbar({ open: true, message: "Failed to save option!", severity: "error" });
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -169,96 +163,81 @@ const OptionManagement = () => {
 
   const handleDelete = async (id) => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      setSnackbar({ open: true, message: "Authentication token is required to delete options!", severity: "error" });
-      return;
-    }
+    if (!token) return;
 
     setLoading(true);
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`${API_URL}/${id}`, { headers });
+      await axios.delete(`${API_URL}/${id}`, { headers: { Authorization: `Bearer ${token}` } });
       fetchOptions();
       setSnackbar({ open: true, message: "Option deleted successfully!", severity: "success" });
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to delete option.";
-      console.error("Full error response:", error.response);
-      setSnackbar({ open: true, message: `Error deleting option: ${errorMessage}`, severity: "error" });
+      setSnackbar({ open: true, message: "Failed to delete option!", severity: "error" });
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (role === null)
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f5f7fa" }}>
-        <CircularProgress size={80} thickness={5} sx={{ color: "#1e88e5" }} />
-      </Box>
-    );
+  const handleBack = () => {
+    if (quizId) {
+      navigate(`/quizzes/${quizId}/questions`);
+    } else {
+      setSnackbar({ open: true, message: "Quiz ID not found!", severity: "error" });
+      navigate("/quizzes");
+    }
+  };
 
-  if (role !== "staff" && role !== "children")
-    return (
-      <Box sx={{ textAlign: "center", mt: 8, p: 4, background: "#fff", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", maxWidth: "600px", mx: "auto" }}>
-        <Typography variant="h5" color="error" sx={{ fontWeight: 600 }}>
-          Access Denied
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
-          You do not have permission to view options.
-        </Typography>
-      </Box>
-    );
+  if (role === null) return (
+    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f5f7fa" }}>
+      <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
+    </Box>
+  );
+
+  if (role !== "staff" && role !== "children") return (
+    <Box sx={{ textAlign: "center", mt: 8, p: 4, background: "#fff", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", maxWidth: "600px", mx: "auto" }}>
+      <Typography variant="h5" color="error" sx={{ fontWeight: 600 }}>
+        Access Denied
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+        You do not have permission to view options.
+      </Typography>
+    </Box>
+  );
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "center",
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #e8f0fe, #f5f7fa)",
-        overflowX: "hidden",
-      }}
-    >
-      <Container
-        maxWidth="lg"
-        sx={{
-          py: 4,
-          width: { xs: "100%", md: "calc(100% - 280px)" }, // Adjust width to account for sidebar
-          ml: { xs: 0, md: "280px" }, // Sidebar margin on larger screens
-        }}
-      >
+    <Box sx={{ padding: "32px", background: "linear-gradient(135deg, #e8f0fe, #f5f7fa)", minHeight: "100vh" }}>
+      <Container maxWidth="lg">
         {/* Header Section */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4, flexWrap: "wrap", gap: 2 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: "#1a237e", fontSize: { xs: "1.5rem", md: "2rem" } }}>
-            Option Management ({options.length})
-          </Typography>
-          {role === "staff" && (
-            <Box sx={{ display: "flex", gap: 2 }}>
-              <StyledButton
-                variant="contained"
-                startIcon={<AddCircle />}
-                onClick={() => handleOpenDialog()}
-                disabled={loading}
-                sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}
-              >
-                Add Option
-              </StyledButton>
-              <StyledButton
-                variant="outlined"
-                startIcon={<Refresh />}
-                onClick={fetchOptions}
-                disabled={loading}
-                sx={{ borderColor: "#1e88e5", color: "#1e88e5" }}
-              >
-                Refresh
-              </StyledButton>
-            </Box>
-          )}
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: "#2c3e50" }}>
+              Option Management
+            </Typography>
+            <Typography variant="subtitle1" sx={{ color: "#7f8c8d", mt: 1 }}>
+              Manage all options ({options.length} options)
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <StyledButton variant="outlined" startIcon={<ArrowBack />} onClick={handleBack} sx={{ borderColor: "#3498db", color: "#3498db" }}>
+              Back
+            </StyledButton>
+            {role === "staff" && (
+              <>
+                <StyledButton variant="contained" startIcon={<AddCircle />} onClick={() => handleOpenDialog()} sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}>
+                  Add Option
+                </StyledButton>
+                <StyledButton variant="outlined" startIcon={<Refresh />} onClick={fetchOptions} sx={{ borderColor: "#3498db", color: "#3498db" }}>
+                  Refresh
+                </StyledButton>
+              </>
+            )}
+          </Box>
         </Box>
 
         {/* Loading Indicator */}
         {loading && (
           <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
-            <CircularProgress size={80} thickness={5} sx={{ color: "#1e88e5" }} />
+            <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
           </Box>
         )}
 
@@ -267,24 +246,25 @@ const OptionManagement = () => {
           <Grid container spacing={3}>
             {options.slice((page - 1) * rowsPerPage, page * rowsPerPage).map((option, index) => (
               <Grid item xs={12} sm={6} md={3} key={option.id}>
-                <Fade in={true} timeout={300 + index * 100}>
+                <Fade in timeout={300 + index * 100}>
                   <StyledCard>
                     <CardMedia
                       component="img"
                       height="140"
                       image={option.imageUrl || "https://via.placeholder.com/300x140?text=Option+Image"}
-                      alt="Option"
+                      alt={option.name}
                       sx={{ objectFit: "cover", borderTopLeftRadius: "15px", borderTopRightRadius: "15px" }}
                     />
-                    <CardContent sx={{ padding: "16px", textAlign: "center" }}>
-                      <Typography
-                        variant="h6"
-                        fontWeight="bold"
-                        sx={{ minHeight: "3rem", fontSize: "1.1rem", color: "#1a237e" }}
-                      >
-                        {option.context || "No Context"}
-                      </Typography>
-                      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 1, mt: 1 }}>
+                    <CardContent sx={{ padding: "16px", flexGrow: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                      <Box>
+                        <Typography variant="h6" fontWeight="bold" sx={{ color: "#2c3e50" }}>
+                          {option.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ my: 1 }}>
+                          {option.context?.slice(0, 100)}...
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 1 }}>
                         {option.isCorrect ? (
                           <CheckCircleIcon color="success" sx={{ fontSize: 30 }} />
                         ) : (
@@ -295,22 +275,12 @@ const OptionManagement = () => {
                         </Typography>
                       </Box>
                       {role === "staff" && (
-                        <Box sx={{ display: "flex", justifyContent: "center", mt: 2, gap: 1 }}>
-                          <IconButton
-                            color="info"
-                            onClick={() => handleOpenDialog(option)}
-                            disabled={loading}
-                            sx={{ "&:hover": { backgroundColor: "rgba(25, 118, 210, 0.1)" } }}
-                          >
-                            <Edit sx={{ fontSize: "1.8rem" }} />
+                        <Box sx={{ mt: 2, display: "flex", justifyContent: "center", gap: 1 }}>
+                          <IconButton onClick={() => handleOpenDialog(option)} sx={{ color: "#1976d2", "&:hover": { color: "#1565c0" } }}>
+                            <Edit fontSize="small" />
                           </IconButton>
-                          <IconButton
-                            color="error"
-                            onClick={() => handleDelete(option.id)}
-                            disabled={loading}
-                            sx={{ "&:hover": { backgroundColor: "rgba(211, 47, 47, 0.1)" } }}
-                          >
-                            <Delete sx={{ fontSize: "1.8rem" }} />
+                          <IconButton onClick={() => handleDelete(option.id)} sx={{ color: "#d32f2f", "&:hover": { color: "#b71c1c" } }}>
+                            <Delete fontSize="small" />
                           </IconButton>
                         </Box>
                       )}
@@ -322,46 +292,19 @@ const OptionManagement = () => {
           </Grid>
         )}
 
-        {/* Enhanced Empty State */}
+        {/* Empty State */}
         {!loading && options.length === 0 && (
-          <Fade in={true}>
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                minHeight: "50vh",
-                textAlign: "center",
-                background: "rgba(255, 255, 255, 0.8)",
-                borderRadius: "16px",
-                boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-                p: 4,
-                mx: "auto",
-                maxWidth: "600px",
-              }}
-            >
-              <Park sx={{ fontSize: "5rem", color: "#1e88e5", mb: 2 }} />
-              <Typography variant="h5" color="text.primary" sx={{ fontWeight: 600, mb: 2 }}>
-                No Options Found
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ fontSize: "1.2rem", mb: 4 }}>
-                {role === "staff"
-                  ? "It looks like there are no options for this question yet. Add a new option to get started!"
-                  : "There are no options available for this question. Check back later!"}
-              </Typography>
-              {role === "staff" && (
-                <StyledButton
-                  variant="contained"
-                  startIcon={<AddCircle />}
-                  onClick={() => handleOpenDialog()}
-                  sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}
-                >
-                  Add Option
-                </StyledButton>
-              )}
-            </Box>
-          </Fade>
+          <Box sx={{ textAlign: "center", py: 8 }}>
+            <Park sx={{ fontSize: "5rem", color: "#3498db", mb: 2 }} />
+            <Typography variant="h6" color="text.secondary" sx={{ fontSize: "1.4rem", mb: 2 }}>
+              No options found
+            </Typography>
+            {role === "staff" && (
+              <StyledButton variant="contained" startIcon={<AddCircle />} onClick={() => handleOpenDialog()} sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}>
+                Add Option
+              </StyledButton>
+            )}
+          </Box>
         )}
 
         {/* Pagination */}
@@ -376,16 +319,21 @@ const OptionManagement = () => {
               sx={{
                 "& .MuiPaginationItem-root": {
                   fontSize: "1.1rem",
+                  "&:hover": { backgroundColor: "#e3f2fd" },
+                },
+                "& .Mui-selected": {
+                  backgroundColor: "#3498db !important",
+                  color: "#fff",
                 },
               }}
             />
           </Box>
         )}
 
-        {/* Dialog for Adding/Editing Options */}
+        {/* Dialog for Add/Edit Option */}
         {role === "staff" && (
           <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { borderRadius: "16px" } }}>
-            <DialogTitle sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)", color: "#fff", fontSize: "1.8rem", fontWeight: 600, py: 2 }}>
+            <DialogTitle sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)", color: "#fff", fontSize: "1.8rem", fontWeight: 600, py: 2 }}>
               {editingOption?.id ? "Edit Option" : "Add New Option"}
             </DialogTitle>
             <DialogContent sx={{ pt: 3 }}>
@@ -404,6 +352,8 @@ const OptionManagement = () => {
                 label="Context"
                 fullWidth
                 margin="normal"
+                multiline
+                rows={3}
                 value={editingOption?.context || ""}
                 onChange={(e) => setEditingOption({ ...editingOption, context: e.target.value })}
                 required
@@ -416,40 +366,32 @@ const OptionManagement = () => {
                   <Checkbox
                     checked={editingOption?.isCorrect || false}
                     onChange={(e) => setEditingOption({ ...editingOption, isCorrect: e.target.checked })}
+                    sx={{ color: "#3498db", "&.Mui-checked": { color: "#3498db" } }}
                   />
                 }
                 label="Is Correct?"
-                sx={{ "& .MuiTypography-root": { fontSize: "1.1rem" } }}
+                sx={{ "& .MuiTypography-root": { fontSize: "1.1rem", color: "#2c3e50" } }}
               />
             </DialogContent>
             <DialogActions sx={{ p: 3, justifyContent: "space-between" }}>
-              <StyledButton variant="outlined" onClick={handleCloseDialog} disabled={loading} sx={{ borderColor: "#1e88e5", color: "#1e88e5" }}>
+              <StyledButton variant="outlined" onClick={handleCloseDialog} sx={{ borderColor: "#3498db", color: "#3498db" }}>
                 Cancel
               </StyledButton>
-              <StyledButton
-                variant="contained"
-                onClick={handleSave}
-                disabled={loading}
-                sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}
-              >
+              <StyledButton variant="contained" onClick={handleSave} sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}>
                 {loading ? <CircularProgress size={24} color="inherit" /> : "Save"}
               </StyledButton>
             </DialogActions>
           </Dialog>
         )}
 
-        {/* Snackbar for Notifications */}
+        {/* Snackbar */}
         <Snackbar
           open={snackbar.open}
-          autoHideDuration={3000}
+          autoHideDuration={4000}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
-          <Alert
-            severity={snackbar.severity}
-            onClose={() => setSnackbar({ ...snackbar, open: false })}
-            sx={{ fontSize: "1.1rem", py: 1 }}
-          >
+          <Alert severity={snackbar.severity} sx={{ width: "100%", fontSize: "1.1rem" }}>
             {snackbar.message}
           </Alert>
         </Snackbar>

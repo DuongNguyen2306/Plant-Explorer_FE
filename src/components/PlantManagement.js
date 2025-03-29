@@ -41,17 +41,17 @@ const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
   boxShadow: "0 8px 30px rgba(0, 0, 0, 0.12)",
   background: "#fff",
   margin: "0 auto",
-  overflowX: "auto", // Allow horizontal scrolling if needed
-  maxWidth: "100%", // Ensure it doesn't overflow the parent container
+  overflowX: "auto",
+  maxWidth: "100%",
 }));
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   padding: "18px 24px",
   fontSize: "1.1rem",
   borderBottom: "1px solid rgba(224, 224, 224, 0.7)",
-  whiteSpace: "nowrap", // Prevent text wrapping to avoid overflow
+  whiteSpace: "nowrap",
   overflow: "hidden",
-  textOverflow: "ellipsis", // Truncate long text
+  textOverflow: "ellipsis",
 }));
 
 const StyledTableHeadCell = styled(TableCell)(({ theme }) => ({
@@ -59,7 +59,7 @@ const StyledTableHeadCell = styled(TableCell)(({ theme }) => ({
   fontSize: "1.2rem",
   fontWeight: 700,
   color: "#fff",
-  background: "linear-gradient(90deg, #1e88e5, #42a5f5)",
+  background: "linear-gradient(90deg, #2c3e50, #3498db)",
   borderBottom: "none",
   whiteSpace: "nowrap",
 }));
@@ -77,11 +77,42 @@ const StyledButton = styled(Button)(({ theme }) => ({
   },
 }));
 
+const StyledSearchField = styled(TextField)(({ theme }) => ({
+  width: { xs: "100%", sm: "400px", md: "500px" },
+  maxWidth: "100%",
+  backgroundColor: "#fff",
+  borderRadius: "30px",
+  boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
+  "& .MuiInputBase-root": {
+    fontSize: "1.1rem",
+    padding: "4px 12px",
+  },
+  "& .MuiOutlinedInput-root": {
+    "& fieldset": {
+      borderColor: "#3498db",
+    },
+    "&:hover fieldset": {
+      borderColor: "#2980b9",
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: "#3498db",
+    },
+  },
+  "& .MuiInputLabel-root": {
+    color: "#3498db",
+    fontWeight: 500,
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: "#2980b9",
+  },
+}));
+
 const PlantManagement = () => {
   const [plants, setPlants] = useState([]);
+  const [filteredPlants, setFilteredPlants] = useState([]); // For search filtering
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(10);
+  const [rowsPerPage] = useState(5); // Changed to 5 plants per page
   const [role, setRole] = useState(null);
   const [open, setOpen] = useState(false);
   const [editingPlant, setEditingPlant] = useState(null);
@@ -99,35 +130,46 @@ const PlantManagement = () => {
       });
   }, []);
 
-  const fetchPlants = useCallback(async (searchQuery = "") => {
+  const fetchPlants = useCallback(async () => {
     setLoading(true);
     try {
-      let response = searchQuery
-        ? await axios.get(`${SEARCH_API_URL}/${encodeURIComponent(searchQuery)}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          })
-        : await axios.get(API_URL, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          });
+      const response = await axios.get(API_URL, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
       setPlants(response.data || []);
+      setFilteredPlants(response.data || []); // Initialize filtered plants
       setSnackbar({ open: true, message: "Plants loaded successfully!", severity: "success" });
     } catch (error) {
       console.error("Error fetching plants:", error);
       setSnackbar({ open: true, message: "Failed to fetch plants", severity: "error" });
       setPlants([]);
+      setFilteredPlants([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const debouncedFetchPlants = useCallback(debounce((query) => fetchPlants(query), 500), [fetchPlants]);
+  // Search filter logic (by plant name, case-insensitive)
+  const handleSearch = useCallback(
+    debounce((query) => {
+      const filtered = plants.filter((plant) =>
+        plant.name.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredPlants(filtered);
+      setPage(0); // Reset to first page on search
+    }, 500),
+    [plants]
+  );
 
   useEffect(() => {
     if (role === "staff" || role === "children") {
-      debouncedFetchPlants(search);
-      setPage(0);
+      fetchPlants();
     }
-  }, [role, search, debouncedFetchPlants]);
+  }, [role, fetchPlants]);
+
+  useEffect(() => {
+    handleSearch(search);
+  }, [search, handleSearch]);
 
   const handleOpenDialog = (plant = null) => {
     setEditingPlant(plant || { name: "", scientificName: "", description: "" });
@@ -156,7 +198,7 @@ const PlantManagement = () => {
         ? await axios.put(`${API_URL}/${editingPlant.id}`, data, { headers })
         : await axios.post(API_URL, data, { headers });
       setSnackbar({ open: true, message: `Plant ${editingPlant.id ? "updated" : "created"} successfully!`, severity: "success" });
-      await fetchPlants(search);
+      await fetchPlants();
       handleCloseDialog();
     } catch (error) {
       setSnackbar({ open: true, message: "Failed to save plant", severity: "error" });
@@ -170,7 +212,7 @@ const PlantManagement = () => {
       setLoading(true);
       try {
         await axios.delete(`${API_URL}/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
-        await fetchPlants(search);
+        await fetchPlants();
         setSnackbar({ open: true, message: "Plant deleted successfully!", severity: "success" });
       } catch (error) {
         setSnackbar({ open: true, message: "Failed to delete plant", severity: "error" });
@@ -185,7 +227,7 @@ const PlantManagement = () => {
   if (role === null)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f5f7fa" }}>
-        <CircularProgress size={80} thickness={5} sx={{ color: "#1e88e5" }} />
+        <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
       </Box>
     );
 
@@ -207,22 +249,27 @@ const PlantManagement = () => {
         padding: "32px",
         background: "linear-gradient(135deg, #e8f0fe, #f5f7fa)",
         minHeight: "100vh",
-        ml: { xs: 0, md: "280px" }, // Adjust margin-left for sidebar, responsive for smaller screens
-        maxWidth: "100%", // Prevent overflow
-        overflowX: "hidden", // Prevent horizontal overflow
+        ml: { xs: 0, md: "280px" },
+        maxWidth: "100%",
+        overflowX: "hidden",
       }}
     >
       {/* Header Section */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4, flexWrap: "wrap", gap: 2 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: "#1a237e", fontSize: { xs: "1.5rem", md: "2rem" } }}>
-          Plant Management ({plants.length})
-        </Typography>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 700, color: "#2c3e50", fontSize: { xs: "1.5rem", md: "2rem" } }}>
+            Plant Explorer
+          </Typography>
+          <Typography variant="subtitle1" sx={{ color: "#7f8c8d", fontSize: { xs: "1rem", md: "1.2rem" }, mt: 1 }}>
+            Manage your plant collection ({filteredPlants.length} plants)
+          </Typography>
+        </Box>
         {role === "staff" && (
           <Box sx={{ display: "flex", gap: 2 }}>
-            <StyledButton variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()} sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}>
-              Add New
+            <StyledButton variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()} sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}>
+              Add New Plant
             </StyledButton>
-            <StyledButton variant="outlined" startIcon={<Refresh />} onClick={() => fetchPlants(search)} sx={{ borderColor: "#1e88e5", color: "#1e88e5" }}>
+            <StyledButton variant="outlined" startIcon={<Refresh />} onClick={() => fetchPlants()} sx={{ borderColor: "#3498db", color: "#3498db" }}>
               Refresh
             </StyledButton>
           </Box>
@@ -231,23 +278,15 @@ const PlantManagement = () => {
 
       {/* Search Section */}
       <Box sx={{ mb: 4, display: "flex", justifyContent: "center" }}>
-        <TextField
-          label="Search Plants"
+        <StyledSearchField
+          label="Search Plants by Name"
           variant="outlined"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{
-            width: { xs: "100%", sm: "400px", md: "500px" }, // Responsive width
-            maxWidth: "100%", // Prevent overflow
-            backgroundColor: "#fff",
-            borderRadius: "12px",
-            boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
-            "& .MuiInputBase-root": { fontSize: "1.1rem" },
-          }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <Search sx={{ color: "#1e88e5", fontSize: "1.8rem" }} />
+                <Search sx={{ color: "#3498db", fontSize: "1.8rem" }} />
               </InputAdornment>
             ),
           }}
@@ -257,14 +296,14 @@ const PlantManagement = () => {
       {/* Loading State */}
       {loading && (
         <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
-          <CircularProgress size={80} thickness={5} sx={{ color: "#1e88e5" }} />
+          <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
         </Box>
       )}
 
       {/* Table Section */}
       {!loading && (
         <StyledTableContainer component={Paper}>
-          <Table sx={{ minWidth: "650px" }}> {/* Ensure a minimum width for readability */}
+          <Table sx={{ minWidth: "650px" }}>
             <TableHead>
               <TableRow>
                 <StyledTableHeadCell sx={{ width: { xs: "35%", md: "40%" }, minWidth: "200px" }}>Name</StyledTableHeadCell>
@@ -275,7 +314,7 @@ const PlantManagement = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {plants.length === 0 ? (
+              {filteredPlants.length === 0 ? (
                 <TableRow>
                   <StyledTableCell colSpan={3} align="center">
                     <Fade in={true}>
@@ -287,7 +326,7 @@ const PlantManagement = () => {
                           {role === "staff" ? "Add a new plant to get started!" : "Check back later for updates."}
                         </Typography>
                         {role === "staff" && (
-                          <StyledButton variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()} sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}>
+                          <StyledButton variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()} sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}>
                             Add Plant
                           </StyledButton>
                         )}
@@ -296,7 +335,7 @@ const PlantManagement = () => {
                   </StyledTableCell>
                 </TableRow>
               ) : (
-                plants.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((plant, index) => (
+                filteredPlants.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((plant, index) => (
                   <Fade in={true} timeout={300 + index * 100} key={plant.id}>
                     <TableRow
                       sx={{
@@ -318,7 +357,7 @@ const PlantManagement = () => {
                               <IconButton
                                 color="primary"
                                 onClick={() => handleOpenDialog(plant)}
-                                sx={{ "&:hover": { color: "#1e88e5" } }}
+                                sx={{ "&:hover": { color: "#3498db" } }}
                                 disabled={loading}
                               >
                                 <Edit sx={{ fontSize: "1.8rem" }} />
@@ -345,11 +384,11 @@ const PlantManagement = () => {
           </Table>
           <TablePagination
             component="div"
-            count={plants.length}
+            count={filteredPlants.length}
             page={page}
             onPageChange={(e, newPage) => setPage(newPage)}
             rowsPerPage={rowsPerPage}
-            rowsPerPageOptions={[10]}
+            rowsPerPageOptions={[5]} // Fixed to 5
             sx={{ "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: "1.1rem" } }}
           />
         </StyledTableContainer>
@@ -358,7 +397,7 @@ const PlantManagement = () => {
       {/* Dialog for Add/Edit Plant */}
       {role === "staff" && (
         <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth sx={{ "& .MuiDialog-paper": { borderRadius: "16px" } }}>
-          <DialogTitle sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)", color: "#fff", fontSize: "1.8rem", fontWeight: 600, py: 2 }}>
+          <DialogTitle sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)", color: "#fff", fontSize: "1.8rem", fontWeight: 600, py: 2 }}>
             {editingPlant?.id ? "Edit Plant" : "Add New Plant"}
           </DialogTitle>
           <DialogContent sx={{ pt: 3 }}>
@@ -396,10 +435,10 @@ const PlantManagement = () => {
             />
           </DialogContent>
           <DialogActions sx={{ p: 3, justifyContent: "space-between" }}>
-            <StyledButton variant="outlined" onClick={handleCloseDialog} disabled={loading} sx={{ borderColor: "#1e88e5", color: "#1e88e5" }}>
+            <StyledButton variant="outlined" onClick={handleCloseDialog} disabled={loading} sx={{ borderColor: "#3498db", color: "#3498db" }}>
               Cancel
             </StyledButton>
-            <StyledButton variant="contained" onClick={handleSavePlant} disabled={loading} sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}>
+            <StyledButton variant="contained" onClick={handleSavePlant} disabled={loading} sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}>
               {loading ? <CircularProgress size={24} color="inherit" /> : "Save"}
             </StyledButton>
           </DialogActions>

@@ -17,7 +17,7 @@ import {
   Fade,
 } from "@mui/material";
 import { styled } from "@mui/system";
-import { AssignmentTurnedIn } from "@mui/icons-material";
+import { AssignmentTurnedIn, Refresh } from "@mui/icons-material";
 import { BASE_API } from "../constant";
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 
@@ -31,7 +31,7 @@ const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
   margin: "0 auto",
   overflowX: "auto",
   maxWidth: "100%",
-  border: "1px solid rgba(224, 224, 224, 0.5)", // Subtle border for visual separation
+  border: "1px solid rgba(224, 224, 224, 0.5)",
 }));
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
@@ -41,6 +41,11 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
+  color: "#2c3e50",
+  "&:hover": {
+    backgroundColor: "#f5f7fa",
+    transition: "background-color 0.3s ease",
+  },
 }));
 
 const StyledTableHeadCell = styled(TableCell)(({ theme }) => ({
@@ -48,13 +53,13 @@ const StyledTableHeadCell = styled(TableCell)(({ theme }) => ({
   fontSize: "1.2rem",
   fontWeight: 700,
   color: "#fff",
-  background: "linear-gradient(90deg, #1e88e5, #42a5f5)",
+  background: "linear-gradient(90deg, #2c3e50, #3498db)",
   borderBottom: "none",
   whiteSpace: "nowrap",
 }));
 
 const StyledButton = styled(Button)(({ theme }) => ({
-  borderRadius: "30px",
+  borderRadius: "20px",
   padding: "8px 20px",
   textTransform: "none",
   fontWeight: 600,
@@ -69,7 +74,7 @@ const StyledButton = styled(Button)(({ theme }) => ({
 const QuizAttempts = () => {
   const [quizAttempts, setQuizAttempts] = useState([]);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage] = useState(5); // Fixed to 5 items per page
   const [totalCount, setTotalCount] = useState(0);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -107,8 +112,6 @@ const QuizAttempts = () => {
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      console.log("Token:", token);
-      console.log("Requesting URL:", API_URL);
       const response = await axios.get(API_URL, {
         headers: { Authorization: `Bearer ${token}` },
         params: {
@@ -117,20 +120,12 @@ const QuizAttempts = () => {
         },
       });
 
-      console.log("API response:", response.data);
-
       const { data } = response.data;
       setQuizAttempts(data.items || []);
       setTotalCount(data.totalCount || 0);
-
-      if (data.totalCount > 0 && rowsPerPage !== data.totalCount) {
-        setRowsPerPage(data.totalCount);
-      }
-
       setLoading(false);
     } catch (error) {
       console.error("Error fetching quiz attempts:", error);
-      console.log("Error response:", error.response);
       setError("Failed to fetch quiz attempts: " + (error.response?.data?.message || error.message));
       setLoading(false);
     }
@@ -140,19 +135,10 @@ const QuizAttempts = () => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const handleViewDetail = (attemptId) => {
-    navigate(`/quiz-attempt/${attemptId}/detail`);
-  };
-
   if (role === null)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f5f7fa" }}>
-        <CircularProgress size={80} thickness={5} sx={{ color: "#1e88e5" }} />
+        <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
       </Box>
     );
 
@@ -171,7 +157,7 @@ const QuizAttempts = () => {
   if (loading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh", background: "#f5f7fa" }}>
-        <CircularProgress size={80} thickness={5} sx={{ color: "#1e88e5" }} />
+        <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
       </Box>
     );
 
@@ -187,7 +173,7 @@ const QuizAttempts = () => {
         <StyledButton
           variant="contained"
           onClick={fetchQuizAttempts}
-          sx={{ mt: 3, background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}
+          sx={{ mt: 3, background: "linear-gradient(90deg, #2c3e50, #3498db)" }}
         >
           Retry
         </StyledButton>
@@ -199,30 +185,38 @@ const QuizAttempts = () => {
       sx={{
         display: "flex",
         justifyContent: "center",
+        alignItems: "center", // Center vertically
         minHeight: "100vh",
         background: "linear-gradient(135deg, #e8f0fe, #f5f7fa)",
         overflowX: "hidden",
+        padding: "32px",
+        width: "100%", // Ensure the Box takes the full width
       }}
     >
       <Box
         sx={{
           py: 4,
-          width: { xs: "100%", md: "calc(100% - 280px)" }, // Adjust width to account for sidebar
-          ml: { xs: 0, md: "280px" }, // Sidebar margin on larger screens
-          px: { xs: 2, md: 3 }, // Reduced padding for better balance
-          maxWidth: "1200px", // Constrain the content width for better centering
+          width: { xs: "100%", md: "100%" }, // Remove sidebar offset
+          maxWidth: "1200px", // Constrain the content width
           mx: "auto", // Center the content horizontally
+          px: { xs: 2, md: 3 },
         }}
       >
         {/* Header Section */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4, flexWrap: "wrap", gap: 2 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: "#1a237e", fontSize: { xs: "1.5rem", md: "2rem" } }}>
-            Quiz Attempts ({totalCount})
-          </Typography>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: "#2c3e50", fontSize: { xs: "1.5rem", md: "2rem" } }}>
+              Quiz Attempts
+            </Typography>
+            <Typography variant="subtitle1" sx={{ color: "#7f8c8d", mt: 1 }}>
+              Total Attempts: {totalCount}
+            </Typography>
+          </Box>
           <StyledButton
             variant="contained"
+            startIcon={<Refresh />}
             onClick={fetchQuizAttempts}
-            sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}
+            sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}
           >
             Refresh
           </StyledButton>
@@ -233,12 +227,9 @@ const QuizAttempts = () => {
           <Table sx={{ minWidth: "650px" }}>
             <TableHead>
               <TableRow>
-                <StyledTableHeadCell sx={{ width: { xs: "25%", md: "25%" }, minWidth: "150px" }}>Child Name</StyledTableHeadCell>
-                <StyledTableHeadCell sx={{ width: { xs: "25%", md: "25%" }, minWidth: "150px" }}>Quiz Name</StyledTableHeadCell>
-                <StyledTableHeadCell sx={{ width: { xs: "30%", md: "30%" }, minWidth: "200px" }}>Attempt Time</StyledTableHeadCell>
-                <StyledTableHeadCell align="center" sx={{ width: { xs: "20%", md: "20%" }, minWidth: "150px" }}>
-                  Actions
-                </StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "30%", minWidth: "150px" }}>Child Name</StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "30%", minWidth: "150px" }}>Quiz Name</StyledTableHeadCell>
+                <StyledTableHeadCell sx={{ width: "40%", minWidth: "200px" }}>Attempt Time</StyledTableHeadCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -254,22 +245,12 @@ const QuizAttempts = () => {
                       <StyledTableCell>{attempt.childName}</StyledTableCell>
                       <StyledTableCell>{attempt.quizName}</StyledTableCell>
                       <StyledTableCell>{new Date(attempt.attemptTime).toLocaleString()}</StyledTableCell>
-                      <StyledTableCell align="center">
-                        <StyledButton
-                          variant="outlined"
-                          color="info"
-                          onClick={() => handleViewDetail(attempt.id)}
-                          sx={{ borderColor: "#1e88e5", color: "#1e88e5" }}
-                        >
-                          View Detail
-                        </StyledButton>
-                      </StyledTableCell>
                     </TableRow>
                   </Fade>
                 ))
               ) : (
                 <TableRow>
-                  <StyledTableCell colSpan={4} align="center">
+                  <StyledTableCell colSpan={3} align="center">
                     <Fade in={true}>
                       <Box
                         sx={{
@@ -280,7 +261,7 @@ const QuizAttempts = () => {
                           py: 6,
                         }}
                       >
-                        <AssignmentTurnedIn sx={{ fontSize: "5rem", color: "#1e88e5", mb: 2 }} />
+                        <AssignmentTurnedIn sx={{ fontSize: "5rem", color: "#3498db", mb: 2 }} />
                         <Typography variant="h6" color="text.secondary" sx={{ fontSize: "1.4rem", mb: 2 }}>
                           No Quiz Attempts Found
                         </Typography>
@@ -289,8 +270,9 @@ const QuizAttempts = () => {
                         </Typography>
                         <StyledButton
                           variant="contained"
+                          startIcon={<Refresh />}
                           onClick={fetchQuizAttempts}
-                          sx={{ background: "linear-gradient(90deg, #1e88e5, #42a5f5)" }}
+                          sx={{ background: "linear-gradient(90deg, #2c3e50, #3498db)" }}
                         >
                           Refresh
                         </StyledButton>
@@ -301,16 +283,28 @@ const QuizAttempts = () => {
               )}
             </TableBody>
           </Table>
-          <TablePagination
-            component="div"
-            count={totalCount}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[1, 5, 10, 25, totalCount]}
-            sx={{ "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: "1.1rem" } }}
-          />
+          {totalCount > rowsPerPage && (
+            <TablePagination
+              component="div"
+              count={totalCount}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              rowsPerPageOptions={[]}
+              sx={{
+                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: "1.1rem" },
+                "& .MuiTablePagination-toolbar": { backgroundColor: "#fafafa", borderTop: "1px solid rgba(224, 224, 224, 0.7)" },
+                "& .MuiPaginationItem-root": {
+                  fontSize: "1.1rem",
+                  "&:hover": { backgroundColor: "#e3f2fd" },
+                },
+                "& .Mui-selected": {
+                  backgroundColor: "#3498db !important",
+                  color: "#fff",
+                },
+              }}
+            />
+          )}
         </StyledTableContainer>
       </Box>
     </Box>
