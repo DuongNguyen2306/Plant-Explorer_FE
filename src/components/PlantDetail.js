@@ -20,7 +20,6 @@ import {
 } from "@mui/material";
 import { BASE_API } from "../constant";
 import Chip from '@mui/material/Chip';
-
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 
 const PlantDetail = () => {
@@ -51,6 +50,7 @@ const PlantDetail = () => {
   const [charDescription, setCharDescription] = useState("");
   const [editingChar, setEditingChar] = useState(null);
   const [editingApp, setEditingApp] = useState(null);
+  const [appName, setAppName] = useState("");
   const [appDescription, setAppDescription] = useState("");
   const navigate = useNavigate();
 
@@ -93,21 +93,34 @@ const PlantDetail = () => {
     setLoading(true);
     setError(null);
     const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
     try {
       const [charRes, appRes, catRes] = await Promise.all([
-        axios.get(`${BASE_API}/plant-characteristics/${plantId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${BASE_API}/plant-applications?plantId=${plantId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${BASE_API}/plants/${plantId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        axios.get(`${BASE_API}/plant-characteristics/${plantId}`, { headers }),
+        axios.get(`${BASE_API}/plant-applications/${plantId}`, { headers }),
+        axios.get(`${BASE_API}/plants/${plantId}`, { headers }),
       ]);
 
       const characteristicsData = charRes.data || [];
-      const applicationsData = appRes.data?.data?.items || appRes.data || [];
+      let applicationsData = appRes.data || [];
+
+      console.log("Raw applications data from API for plantId", plantId, ":", applicationsData);
+
+      if (!Array.isArray(applicationsData)) {
+        console.warn("Applications data is not an array, converting to array:", applicationsData);
+        applicationsData = applicationsData.data?.items || applicationsData.data || [];
+      }
+
+      applicationsData = applicationsData.filter(app => {
+        const matchesPlantId = app.plantId === plantId;
+        if (!matchesPlantId) {
+          console.warn(`Application with ID ${app.id} has plantId ${app.plantId}, but expected ${plantId}. Filtering out.`);
+        }
+        return matchesPlantId;
+      });
+
+      console.log("Filtered applications for plantId", plantId, ":", applicationsData);
+
       const plantData = catRes.data || null;
 
       setCharacteristics(characteristicsData);
@@ -115,7 +128,7 @@ const PlantDetail = () => {
       setCategory(plantData);
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching detail:", error);
+      console.error("Error fetching plant details:", error);
       setError("Failed to fetch plant details: " + (error.response?.data?.message || error.message));
       setLoading(false);
     }
@@ -147,7 +160,8 @@ const PlantDetail = () => {
               characteristicName: categoryName,
               description: charDescription || "",
             };
-            await axios.post(`${BASE_API}/plant-characteristics`, data, { headers });
+            const response = await axios.post(`${BASE_API}/plant-characteristics`, data, { headers });
+            console.log("Add characteristic response:", response.data);
           }
         })
       );
@@ -177,7 +191,8 @@ const PlantDetail = () => {
         description: charDescription || "",
       };
 
-      await axios.put(`${BASE_API}/plant-characteristics/${editingChar.id}`, data, { headers });
+      const response = await axios.put(`${BASE_API}/plant-characteristics/${editingChar.id}`, data, { headers });
+      console.log("Update characteristic response:", response.data);
 
       alert("Characteristic updated successfully!");
       setOpenEditCharDialog(false);
@@ -199,7 +214,8 @@ const PlantDetail = () => {
         Authorization: `Bearer ${token}`,
       };
 
-      await axios.delete(`${BASE_API}/plant-characteristics/${charId}`, { headers });
+      const response = await axios.delete(`${BASE_API}/plant-characteristics/${charId}`, { headers });
+      console.log("Delete characteristic response:", response.data);
 
       alert("Characteristic deleted successfully!");
       await fetchAllData();
@@ -214,6 +230,10 @@ const PlantDetail = () => {
       alert("Please select an application category!");
       return;
     }
+    if (!appName) {
+      alert("Please enter an application name!");
+      return;
+    }
 
     try {
       const token = localStorage.getItem("token");
@@ -222,19 +242,25 @@ const PlantDetail = () => {
         "Content-Type": "application/json",
       };
 
-      const categoryName = applicationCategories.find((cat) => cat.id === selectedAppCategoryId)?.name || "Unknown";
       const data = {
         plantId,
         applicationCategoryId: selectedAppCategoryId,
-        applicationName: categoryName, // Set applicationName to the category name
+        applicationName: appName,
         description: appDescription || "",
       };
 
-      await axios.post(`${BASE_API}/plant-applications`, data, { headers });
+      console.log("Adding application with data:", data);
+      const response = await axios.post(`${BASE_API}/plant-applications`, data, { headers });
+      console.log("Add application response:", response.data);
+
+      if (response.data.plantId !== plantId) {
+        throw new Error("Added application does not belong to this plant!");
+      }
 
       alert("Application added successfully!");
       setOpenAddAppDialog(false);
       setSelectedAppCategoryId("");
+      setAppName("");
       setAppDescription("");
       await fetchAllData();
     } catch (error) {
@@ -254,10 +280,19 @@ const PlantDetail = () => {
       };
 
       const data = {
+        plantId: editingApp.plantId,
+        applicationCategoryId: editingApp.applicationCategoryId,
+        applicationName: editingApp.applicationName,
         description: appDescription || "",
       };
 
-      await axios.put(`${BASE_API}/plant-applications/${editingApp.id}`, data, { headers });
+      console.log("Updating application with data:", data);
+      const response = await axios.put(`${BASE_API}/plant-applications/${editingApp.id}`, data, { headers });
+      console.log("Update application response:", response.data);
+
+      if (response.data.plantId !== plantId) {
+        throw new Error("Updated application does not belong to this plant!");
+      }
 
       alert("Application updated successfully!");
       setOpenEditAppDialog(false);
@@ -272,15 +307,16 @@ const PlantDetail = () => {
 
   const handleDeleteApp = async (appId) => {
     if (!window.confirm("Are you sure you want to delete this application?")) return;
-
+  
     try {
       const token = localStorage.getItem("token");
       const headers = {
         Authorization: `Bearer ${token}`,
       };
-
-      await axios.delete(`${BASE_API}/plant-applications/${appId}`, { headers });
-
+  
+      const response = await axios.delete(`${BASE_API}/plant-applications/${appId}`, { headers });
+      console.log("Delete application response:", response.data);
+  
       alert("Application deleted successfully!");
       await fetchAllData();
     } catch (error) {
@@ -288,6 +324,7 @@ const PlantDetail = () => {
       alert("Failed to delete application: " + (error.response?.data?.message || error.message));
     }
   };
+  
 
   const handleOpenEditDialog = () => {
     if (category) {
@@ -323,7 +360,8 @@ const PlantDetail = () => {
         "Content-Type": "application/json",
       };
 
-      await axios.put(`${BASE_API}/plants/${plantId}`, editFormData, { headers });
+      const response = await axios.put(`${BASE_API}/plants/${plantId}`, editFormData, { headers });
+      console.log("Update plant response:", response.data);
 
       alert("Plant updated successfully!");
       setOpenEditDialog(false);
@@ -363,6 +401,7 @@ const PlantDetail = () => {
   const handleCloseAddAppDialog = () => {
     setOpenAddAppDialog(false);
     setSelectedAppCategoryId("");
+    setAppName("");
     setAppDescription("");
   };
 
@@ -715,7 +754,7 @@ const PlantDetail = () => {
               <Box>
                 <Typography variant="body1" sx={{ marginBottom: "5px" }}>
                   <strong>
-                    {applicationCategories.find((cat) => cat.id === app.applicationCategoryId)?.name || "Unknown Category"}
+                    {app.applicationName || applicationCategories.find((cat) => cat.id === app.applicationCategoryId)?.name || "Unknown Category"}
                   </strong>
                 </Typography>
                 <Typography variant="body1">
@@ -762,7 +801,6 @@ const PlantDetail = () => {
               label="Select Application Category"
             >
               {applicationCategories
-                .filter((cat) => !currentAppCategoryIds.includes(cat.id))
                 .map((category) => (
                   <MenuItem key={category.id} value={category.id}>
                     {category.name}
@@ -770,6 +808,15 @@ const PlantDetail = () => {
                 ))}
             </Select>
           </FormControl>
+          <TextField
+            fullWidth
+            label="Application Name"
+            value={appName}
+            onChange={(e) => setAppName(e.target.value)}
+            margin="normal"
+            placeholder="Enter a unique name for this application"
+            required
+          />
           <TextField
             fullWidth
             label="Description"
@@ -800,6 +847,10 @@ const PlantDetail = () => {
             {editingApp
               ? applicationCategories.find((cat) => cat.id === editingApp.applicationCategoryId)?.name || "Unknown Category"
               : ""}
+          </Typography>
+          <Typography variant="body1" sx={{ marginBottom: "20px" }}>
+            <strong>Name:</strong>{" "}
+            {editingApp ? editingApp.applicationName : ""}
           </Typography>
           <TextField
             fullWidth

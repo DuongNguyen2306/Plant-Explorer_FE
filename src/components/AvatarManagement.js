@@ -50,7 +50,7 @@ const AVATAR_OPTIONS = [
 
 const API_URL = BASE_API + "/avatars";
 
-// Styled Components
+// Styled Components (unchanged)
 const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
   borderRadius: "16px",
   boxShadow: "0 8px 30px rgba(0, 0, 0, 0.12)",
@@ -134,13 +134,20 @@ const AvatarManagement = () => {
   const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(5); // 5 avatars per page
+  const [rowsPerPage] = useState(5);
 
   useEffect(() => {
-    getUserRoleFromAPI().then(setRole);
+    getUserRoleFromAPI().then((userRole) => {
+      setRole(userRole);
+      console.log("User role:", userRole); // Debug log
+    });
   }, []);
 
-  const getAuthToken = () => localStorage.getItem("token") || "";
+  const getAuthToken = () => {
+    const token = localStorage.getItem("token") || "";
+    console.log("Auth token:", token); // Debug log
+    return token;
+  };
 
   const fetchAvatars = useCallback(async () => {
     setLoading(true);
@@ -176,7 +183,7 @@ const AvatarManagement = () => {
         avatar.name.toLowerCase().includes(query.toLowerCase())
       );
       setFilteredAvatars(filtered);
-      setPage(0); // Reset to first page on search
+      setPage(0);
     }, 500),
     [avatars]
   );
@@ -209,17 +216,35 @@ const AvatarManagement = () => {
       const token = getAuthToken();
       if (!token) throw new Error("Authorization token missing! Please log in.");
       const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
       if (editingAvatar.id && !editingAvatar.isDefault) {
-        await axios.put(`${API_URL}/${editingAvatar.id}`, { id: editingAvatar.id, imageUrl: editingAvatar.imageUrl }, { headers });
+        // Revert to PUT as per API documentation
+        const response = await axios.put(`${API_URL}/${editingAvatar.id}`, 
+          { id: editingAvatar.id, name: editingAvatar.name, imageUrl: editingAvatar.imageUrl }, 
+          { headers }
+        );
+        console.log("Update response:", response.data); // Debug log
         setSnackbar({ open: true, message: "Avatar updated successfully!", severity: "success" });
       } else {
-        await axios.post(API_URL, { name: editingAvatar.name, imageUrl: editingAvatar.imageUrl }, { headers });
+        const response = await axios.post(API_URL, 
+          { name: editingAvatar.name, imageUrl: editingAvatar.imageUrl }, 
+          { headers }
+        );
+        console.log("Create response:", response.data); // Debug log
         setSnackbar({ open: true, message: "Avatar created successfully!", severity: "success" });
       }
       fetchAvatars();
       handleCloseDialog();
     } catch (error) {
-      setSnackbar({ open: true, message: "Failed to save avatar: " + (error.response?.data?.message || error.message), severity: "error" });
+      console.error("Save avatar error:", error.response || error); // Detailed error logging
+      const errorMessage = error.response?.status === 403 
+        ? "You do not have permission to update avatars. Please contact an admin."
+        : `Failed to save avatar: ${error.response?.status} - ${error.response?.data?.message || error.message}`;
+      setSnackbar({ 
+        open: true, 
+        message: errorMessage, 
+        severity: "error" 
+      });
     } finally {
       setLoading(false);
     }
@@ -337,7 +362,7 @@ const AvatarManagement = () => {
       {/* Loading/Error States */}
       {loading && (
         <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
-          <CircularProgress size={80} thickness={5} sx={{ color: "#" }} />
+          <CircularProgress size={80} thickness={5} sx={{ color: "#3498db" }} />
         </Box>
       )}
       {error && (
