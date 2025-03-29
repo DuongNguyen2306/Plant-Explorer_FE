@@ -19,6 +19,8 @@ import {
   TextField,
 } from "@mui/material";
 import { BASE_API } from "../constant";
+import Chip from '@mui/material/Chip';
+
 import { getUserRoleFromAPI } from "../utils/roleUtils";
 
 const PlantDetail = () => {
